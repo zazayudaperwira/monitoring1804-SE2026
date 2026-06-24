@@ -1,40 +1,46 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbyPob9uO9sS1Ssg0jw2yPBpPhjiSVoRRVT_NVPwQQcblbIYTkaOjtyicf528rpQt08hBw/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyG5sC5JFMHSr0725mGPPVQDDjQQswm9sjDQPXzvXI_HnA8oMLS-5JhbSLNyBze06C1vA/exec";
 let allData = {};
 
-$(document).ready(async () => {
-    allData = await (await fetch(API_URL)).json();
-    initDashboard();
-});
-
-function initDashboard() {
-    // 1. Summary Kabupaten
-    const kab = allData["Kecamatan"].find(r => r["Kecamatan"]?.includes("Lampung Timur"));
-    $('#totalProgres').text(kab ? (parseFloat(kab["PROGRES"])*100).toFixed(2) + "%" : "0%");
-
-    // 2. Grafik Status (Donut Chart)
-    const statusLabels = ['OPEN', 'DRAFT', 'SUBMITTED BY Pencacah', 'REJECTED BY Pengawas', 'APPROVED BY Pengawas'];
-    new Chart(document.getElementById('statusChart'), {
-        type: 'doughnut',
-        data: {
-            labels: statusLabels,
-            datasets: [{
-                data: statusLabels.map(s => kab[s] || 0),
-                backgroundColor: ['#fb923c', '#f97316', '#ea580c', '#c2410c', '#9a3412']
-            }]
-        }
-    });
-
-    loadTable('Kecamatan');
+async function fetchData() {
+    const res = await fetch(API_URL);
+    allData = await res.json();
+    renderDashboard();
+    changeTab('Kecamatan');
 }
 
-function loadTable(sheet) {
+function renderDashboard() {
+    const kab = allData["Kecamatan"].find(r => r["Kecamatan"]?.includes("Lampung Timur"));
+    if (kab) {
+        $('#totalProgres').text((parseFloat(kab["PROGRES"] || 0) * 100).toFixed(2) + "%");
+        
+        // Setup Chart
+        const ctx = document.getElementById('statusChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['OPEN', 'DRAFT', 'SUBMITTED', 'REJECTED', 'APPROVED'],
+                datasets: [{
+                    data: [kab["OPEN"], kab["DRAFT"], kab["SUBMITTED BY Pencacah"], kab["REJECTED BY Pengawas"], kab["APPROVED BY Pengawas"]],
+                    backgroundColor: ['#fb923c', '#f97316', '#ea580c', '#c2410c', '#9a3412']
+                }]
+            }
+        });
+    }
+}
+
+function changeTab(sheetName) {
+    $('.tab-btn').removeClass('bg-orange-600 text-white').addClass('bg-orange-100 text-orange-700');
+    $(`button[onclick="changeTab('${sheetName}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
+
+    const data = allData[sheetName];
     if ($.fn.DataTable.isDataTable('#mainDataTable')) $('#mainDataTable').DataTable().destroy();
     
-    const data = allData[sheet];
     $('#mainDataTable').DataTable({
         data: data,
         columns: Object.keys(data[0]).map(k => ({ title: k, data: k })),
         scrollX: true,
-        pageLength: 10
+        destroy: true
     });
 }
+
+$(document).ready(fetchData);
