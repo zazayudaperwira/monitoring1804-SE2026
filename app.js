@@ -1,5 +1,5 @@
-// GANTI TAUTAN INI dengan URL Web App hasil Deploy Apps Script Anda nanti
-const API_URL = "https://script.google.com/macros/s/AKfycbzsYmYcYzFex67e7t29ATnQcnPCqOcZG-3hOwdGT5E9UyWT12XSm3chW-llsoGGLdpx/exec";
+// JANGAN LUPA: Tempelkan URL Web App hasil deploy Apps Script Anda di bawah ini
+const API_URL = "https://script.google.com/macros/s/AKfycbyjR0UNurdTpe4IHZ5NRndhR2XEpmQ3F2a_wiu6hIbPLRlKZz54DvOsp8MM-aEprpCnxg/exec";
 
 let chartInstanceStatus = null;
 let chartInstancePetugas = null;
@@ -10,41 +10,42 @@ $(document).ready(function() {
 
 async function fetchData() {
     try {
-        const response = await fetch(API_URL);
+        const response = await fetch(API_URL, { method: 'GET', redirect: 'follow' });
         const jsonResult = await response.json();
         
         document.getElementById('loader').classList.add('hidden');
         document.getElementById('dashboardContent').classList.remove('hidden');
         
-        // Atur penanda waktu update
-        const sekarang = new Date();
-        document.getElementById('txtLastUpdate').innerText = `Terakhir Sync: ${sekarang.toLocaleTimeString('id-ID')} WIB`;
+        const timestamp = new Date();
+        document.getElementById('txtLastUpdate').innerText = `Terakhir Sinkron: ${timestamp.toLocaleTimeString('id-ID')} WIB`;
         
-        prosesDashboard(jsonResult);
+        renderDashboard(jsonResult);
     } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Fetch Error:", error);
         document.getElementById('loader').innerHTML = `
-            <p class="text-red-500 font-semibold">Gagal memuat data dari API.</p>
-            <p class="text-xs text-slate-400">Pastikan URL Web App Apps Script sudah benar dan dideploy sebagai 'Anyone'.</p>
+            <div class="p-4 text-center">
+                <p class="text-red-500 font-bold text-sm">Koneksi API Terputus atau Bermasalah</p>
+                <p class="text-xs text-slate-400 mt-1">Harap pastikan skrip dideploy menggunakan tipe 'New Version' dan akses disetel ke 'Anyone'.</p>
+            </div>
         `;
     }
 }
 
-function prosesDashboard(data) {
-    let totalMuatan = 0, approved = 0, progress = 0, open = 0;
+function renderDashboard(data) {
+    let totalBeban = 0, approved = 0, progress = 0, open = 0;
     let statusSummary = {};
-    let petugasApproved = {};
+    let pplPerformance = {};
 
     data.forEach(row => {
         let count = parseInt(row.count) || 0;
         let status = (row.status || '').toUpperCase().trim();
-        let email = row.email || row.username || 'Tanpa Nama';
+        let pplName = row.PPL || 'Tanpa Nama';
 
-        totalMuatan += count;
+        totalBeban += count;
 
         if (status === 'APPROVED BY PENGAWAS') {
             approved += count;
-            petugasApproved[email] = (petugasApproved[email] || 0) + count;
+            pplPerformance[pplName] = (pplPerformance[pplName] || 0) + count;
         } else if (status === 'OPEN') {
             open += count;
         } else {
@@ -54,13 +55,13 @@ function prosesDashboard(data) {
         statusSummary[row.status] = (statusSummary[row.status] || 0) + count;
     });
 
-    // Update UI Card
-    document.getElementById('cardTotalMuatan').innerText = totalMuatan.toLocaleString('id-ID');
+    // Pasang Nilai Angka Makro
+    document.getElementById('cardTotalMuatan').innerText = totalBeban.toLocaleString('id-ID');
     document.getElementById('cardApproved').innerText = approved.toLocaleString('id-ID');
     document.getElementById('cardProgress').innerText = progress.toLocaleString('id-ID');
     document.getElementById('cardOpen').innerText = open.toLocaleString('id-ID');
 
-    // Chart Pie Status
+    // Chart Komposisi Status Dokumen
     if (chartInstanceStatus) chartInstanceStatus.destroy();
     chartInstanceStatus = new Chart(document.getElementById('chartStatus').getContext('2d'), {
         type: 'doughnut',
@@ -68,7 +69,7 @@ function prosesDashboard(data) {
             labels: Object.keys(statusSummary),
             datasets: [{
                 data: Object.values(statusSummary),
-                backgroundColor: ['#f43f5e', '#f59e0b', '#3b82f6', '#10b981', '#6366f1', '#a855f7']
+                backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#6366f1', '#ec4899']
             }]
         },
         options: {
@@ -77,45 +78,75 @@ function prosesDashboard(data) {
         }
     });
 
-    // Chart Bar Petugas
-    let sortedPetugas = Object.entries(petugasApproved).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    // Chart Top 10 PPL
+    let topPpl = Object.entries(pplPerformance).sort((a, b) => b[1] - a[1]).slice(0, 10);
     if (chartInstancePetugas) chartInstancePetugas.destroy();
     chartInstancePetugas = new Chart(document.getElementById('chartPetugas').getContext('2d'), {
         type: 'bar',
         data: {
-            labels: sortedPetugas.map(x => x[0].split('@')[0]),
-            datasets: [{ label: 'Approved', data: sortedPetugas.map(x => x[1]), backgroundColor: '#10b981', borderRadius: 6 }]
+            labels: topPpl.map(item => item[0].replace(/\[.*?\]\s*/g, '')), // Bersihkan format ID [1804...] dari nama petugas agar rapi
+            datasets: [{
+                label: 'Dokumen Disetujui (Approved)',
+                data: topPpl.map(item => item[1]),
+                backgroundColor: '#10b981',
+                borderRadius: 4
+            }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { y: { grid: { display: false } } }
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                y: { beginAtZero: true }
+            },
+            plugins: { legend: { display: false } }
         }
     });
 
-    // Jalankan DataTable
-    initDataTable(data);
+    // Eksekusi Pembuatan DataTable
+    buildDataTable(data);
 }
 
-function initDataTable(data) {
+function buildDataTable(data) {
     if ($.fn.DataTable.isDataTable('#tableRaw')) {
         $('#tableRaw').DataTable().destroy();
         $('#tableRaw').empty();
     }
 
-    const columnsHeader = Object.keys(data[0]).map(key => {
-        return { title: key, data: key, defaultContent: "" };
+    // Tentukan urutan kolom yang ideal untuk ditampilan di baris terdepan tabel
+    const preferredOrder = ["Kecamatan", "Desa", "Nama_SLS", "PPL", "PML", "status", "count", "regionCode", "email"];
+    
+    // Gabungkan seluruh key yang ada secara dinamis
+    let allKeys = Object.keys(data[0]);
+    let structuralColumns = preferredOrder.filter(k => allKeys.includes(k));
+    allKeys.forEach(k => {
+        if (!structuralColumns.includes(k)) structuralColumns.push(k);
+    });
+
+    const dataTablesConfig = structuralColumns.map(key => {
+        return { title: key.replace('_', ' '), data: key, defaultContent: "-" };
     });
 
     $('#tableRaw').DataTable({
         data: data,
-        columns: columnsHeader,
+        columns: dataTablesConfig,
         dom: 'Bfrtip',
         buttons: [
-            { extend: 'excelHtml5', title: 'Data_Monitoring', className: 'bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition' }
+            { 
+                extend: 'excelHtml5', 
+                title: 'Data_Monitoring_1804_Joined', 
+                className: 'bg-emerald-600 text-white font-medium text-xs px-3.5 py-2 rounded-lg hover:bg-emerald-700 transition shadow-sm' 
+            }
         ],
         pageLength: 10,
-        language: { search: "Cari:", paginate: { next: "→", previous: "←" } }
+        order: [[5, "desc"]], // Mengurutkan otomatis berdasarkan status
+        language: {
+            search: "Cari data gabungan:",
+            lengthMenu: "Tampilkan _MENU_ data",
+            info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ entri",
+            paginate: { next: "→", previous: "←" }
+        }
     });
-    $('.dt-button').減らせクラス; // Bersihkan default class button datatable
+    
+    $('.dt-button').removeClass('dt-button');
 }
