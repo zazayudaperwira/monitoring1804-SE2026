@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Dashboard Monitoring SE2026</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body{font-family:Arial;background:#f4f6f8;margin:20px}
+.card{background:white;padding:15px;border-radius:10px;margin-bottom:15px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border:1px solid #ddd;padding:6px}
+th{background:#eee}
+.tab button{padding:10px;margin:3px}
+.page{display:none}
+.active{display:block}
+</style>
+</head>
+<body>
+
+<h2>Dashboard Monitoring SE2026</h2>
+
+<div class="card">
+Upload RAW.xlsx:
+<input type="file" id="file">
+</div>
+
+<div class="tab">
+<button onclick="openPage('dashboard')">Dashboard</button>
+<button onclick="openPage('kecamatan')">Kecamatan</button>
+<button onclick="openPage('desa')">Desa</button>
+<button onclick="openPage('ppl')">PPL per PML</button>
+<button onclick="openPage('grafik')">Grafik</button>
+</div>
+
+<div id="dashboard" class="page active card">
+<h3>Ranking</h3>
+<div id="rank"></div>
+</div>
+
+<div id="kecamatan" class="page card">
+<h3>Tabel Kecamatan</h3>
+<div id="tableKec"></div>
+</div>
+
+<div id="desa" class="page card">
+<h3>Tabel Desa</h3>
+<div id="tableDesa"></div>
+</div>
+
+<div id="ppl" class="page card">
+<h3>Tabel PPL berdasarkan PML</h3>
+<div id="tablePPL"></div>
+</div>
+
+<div id="grafik" class="page card">
+<canvas id="chartStatus"></canvas>
+<canvas id="chartKec"></canvas>
+</div>
+
+<script>
+let data=[];
+
+function openPage(x){
+document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+document.getElementById(x).classList.add('active');
+}
+
+file.onchange=e=>{
+let r=new FileReader();
+r.onload=x=>{
+let wb=XLSX.read(x.target.result,{type:'array'});
+let ws=wb.Sheets[wb.SheetNames[0]];
+data=XLSX.utils.sheet_to_json(ws);
+olah();
+};
+r.readAsArrayBuffer(e.target.files[0]);
+}
+
+function olah(){
+
+let kec={},desa={},ppl={},status={},pmlppl={};
+
+data.forEach(r=>{
+let n=+(r.count||0);
+let s=r.status||"";
+let k=r.Kecamatan||r.kecamatan||"";
+let d=r.Desa||r.desa||"";
+let p=r.email||r.Email||"";
+let m=r.PML||"";
+
+status[s]=(status[s]||0)+n;
+kec[k]=(kec[k]||0)+n;
+desa[d]=(desa[d]||0)+n;
+ppl[p]=(ppl[p]||0)+n;
+
+if(!pmlppl[m])pmlppl[m]={};
+pmlppl[m][p]=(pmlppl[m][p]||0)+n;
+});
+
+rank.innerHTML=
+"<h4>Kecamatan Top 10</h4>"+tbl(sort(kec).slice(0,10))+
+"<h4>Desa Top 10</h4>"+tbl(sort(desa).slice(0,10))+
+"<h4>PPL Top 10</h4>"+tbl(sort(ppl).slice(0,10))+
+"<h4>PPL Terendah</h4>"+tbl(sort(ppl).slice(-10));
+
+
+tableKec.innerHTML=tbl(sort(kec));
+tableDesa.innerHTML=tbl(sort(desa));
+
+let rows=[];
+Object.keys(pmlppl).forEach(m=>{
+Object.keys(pmlppl[m]).forEach(p=>{
+rows.push([m,p,pmlppl[m][p]])
+})
+});
+tablePPL.innerHTML=tbl(rows);
+
+new Chart(chartStatus,{
+type:'bar',
+data:{labels:Object.keys(status),
+datasets:[{label:'Assignment',data:Object.values(status)}]}
+});
+
+new Chart(chartKec,{
+type:'bar',
+data:{labels:Object.keys(kec).slice(0,10),
+datasets:[{label:'Kecamatan',data:Object.values(sort(kec).slice(0,10))}]}
+});
+}
+
+function sort(o){
+return Object.entries(o).sort((a,b)=>b[1]-a[1])
+}
+
+function tbl(a){
+return "<table><tr><th>Nama</th><th>Jumlah</th></tr>"+
+a.map(x=>"<tr><td>"+x[0]+"</td><td>"+x[1]+"</td></tr>").join("")+
+"</table>";
+}
+</script>
+
+</body>
+</html>
