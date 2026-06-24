@@ -28,16 +28,17 @@ $(document).ready(function() {
 function updateLeaderboard() {
     if (!allData.PETUGAS) return;
 
-    let sortedData = [...allData.PETUGAS].sort((a, b) => Number(b.Progres) - Number(a.Progres));
+    // Menggunakan 'Persentase Progres' sesuai data JSON Anda
+    let sortedData = [...allData.PETUGAS].sort((a, b) => Number(b['Persentase Progres']) - Number(a['Persentase Progres']));
 
     const renderTable = (data, elementId) => {
         let html = `<table class="w-full text-left"><thead><tr class="border-b"><th class="py-2">Rank</th><th>Kecamatan</th><th>PPL</th><th>Progres</th></tr></thead><tbody>`;
         data.forEach((d, i) => {
             html += `<tr class="border-b">
                 <td class="py-2 font-bold">${i + 1}</td>
-                <td class="text-gray-500">${d.Kecamatan}</td>
-                <td class="font-semibold">${d.PPL}</td>
-                <td class="font-bold">${(Number(d.Progres) * 100).toFixed(1)}%</td>
+                <td class="text-gray-500 text-[10px]">${d.Kecamatan}</td>
+                <td class="font-semibold text-xs">${d.PPL}</td>
+                <td class="font-bold text-xs">${(Number(d['Persentase Progres']) * 100).toFixed(1)}%</td>
             </tr>`;
         });
         html += `</tbody></table>`;
