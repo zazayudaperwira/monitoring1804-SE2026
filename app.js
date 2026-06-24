@@ -1,59 +1,40 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbz1jpNYNXD7EbyCWF1CKpC0JQOqJ9pq-rVEakMRAZMPEzwkW0Fe1ZCFX3FgiM1Gen3a/exec";
-let globalData = {};
+const API_URL = "https://script.google.com/macros/s/AKfycbyPob9uO9sS1Ssg0jw2yPBpPhjiSVoRRVT_NVPwQQcblbIYTkaOjtyicf528rpQt08hBw/exec";
+let allData = {};
 
-$(document).ready(async function() {
-    try {
-        const response = await fetch(API_URL);
-        const rawData = await response.json();
-        
-        // --- FITUR OTOMATIS: Membersihkan Nama Kolom ---
-        // Kita loop setiap tab dan bersihkan key-nya dari spasi liar
-        globalData = Object.keys(rawData).reduce((acc, tab) => {
-            acc[tab] = rawData[tab].map(row => {
-                let cleanRow = {};
-                Object.keys(row).forEach(key => {
-                    cleanRow[key.trim()] = row[key]; // .trim() menghapus spasi kiri/kanan
-                });
-                return cleanRow;
-            });
-            return acc;
-        }, {});
-
-        console.log("Data bersih:", globalData);
-        initDashboard();
-    } catch (err) { console.error("Error:", err); }
+$(document).ready(async () => {
+    allData = await (await fetch(API_URL)).json();
+    initDashboard();
 });
 
 function initDashboard() {
-    // Isi Filter Kecamatan
-    let kecList = [...new Set(globalData["Kecamatan"].map(r => r["Kecamatan"]))];
-    kecList.forEach(k => $('#filterWilayah').append(`<option value="${k}">${k}</option>`));
-    
-    // Inisialisasi Tabel Kecamatan
-    renderTable("Kecamatan");
-    $('#loader').hide();
-    $('#dashboardContent').show();
+    // 1. Summary Kabupaten
+    const kab = allData["Kecamatan"].find(r => r["Kecamatan"]?.includes("Lampung Timur"));
+    $('#totalProgres').text(kab ? (parseFloat(kab["PROGRES"])*100).toFixed(2) + "%" : "0%");
+
+    // 2. Grafik Status (Donut Chart)
+    const statusLabels = ['OPEN', 'DRAFT', 'SUBMITTED BY Pencacah', 'REJECTED BY Pengawas', 'APPROVED BY Pengawas'];
+    new Chart(document.getElementById('statusChart'), {
+        type: 'doughnut',
+        data: {
+            labels: statusLabels,
+            datasets: [{
+                data: statusLabels.map(s => kab[s] || 0),
+                backgroundColor: ['#fb923c', '#f97316', '#ea580c', '#c2410c', '#9a3412']
+            }]
+        }
+    });
+
+    loadTable('Kecamatan');
 }
 
-function renderTable(tab) {
-    let data = globalData[tab] || [];
-    let statusFilter = $('#filterAssignment').val();
-    
-    // Filter Otomatis
-    if(statusFilter) {
-        data = data.filter(r => r[statusFilter] !== undefined); 
-    }
-
+function loadTable(sheet) {
     if ($.fn.DataTable.isDataTable('#mainDataTable')) $('#mainDataTable').DataTable().destroy();
     
+    const data = allData[sheet];
     $('#mainDataTable').DataTable({
         data: data,
-        columns: Object.keys(data[0] || {}).map(k => ({ title: k, data: k })),
-        scrollX: true
+        columns: Object.keys(data[0]).map(k => ({ title: k, data: k })),
+        scrollX: true,
+        pageLength: 10
     });
 }
-
-// Event Listener Otomatis untuk Filter
-$('#filterWilayah, #filterAssignment').on('change', function() {
-    renderTable('Kecamatan'); // Atau sesuaikan dengan tab aktif
-});
