@@ -15,7 +15,7 @@ $(document).ready(function() {
         $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
         
         const kabData = allData.Kecamatan.find(d => d.Kecamatan === "Lampung Timur");
-        if(kabData) $('#kabProgres').text((Number(kabData.Progres) * 100).toFixed(1) + "%");
+        if(kabData) $('#kabProgres').text((Number(kabData.PROGRES) * 100).toFixed(1) + "%");
         
         [...new Set(allData.Kecamatan.map(d => d.Kecamatan))].forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
         
