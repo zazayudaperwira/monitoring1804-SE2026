@@ -1,5 +1,5 @@
 // MASUKKAN URL WEB APP EXEC BARU ANDA DI SINI
-const API_URL = "https://script.google.com/macros/s/AKfycbxH-76Z7fMlqJHNjvbB2lsn3HTJV_IKWZ0sf8bGVpTEzlroDT2GaW-Fd9sDDTVUdtvasw/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyj21A-KOVdCL5RMLjKwEnqg79VpHvUqLzNdIJBVMr5g-xJ7OHWtb9yfZEd3HzQDPphTg/exec";
 
 
 let globalData = {};
