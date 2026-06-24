@@ -35,6 +35,17 @@
             <canvas id="progresChart"></canvas>
         </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-3xl border shadow-sm">
+                <h2 class="font-bold text-green-600 mb-4 text-center">Top 10 Petugas (Tertinggi)</h2>
+                <div id="topPetugas" class="text-xs"></div>
+            </div>
+            <div class="bg-white p-6 rounded-3xl border shadow-sm">
+                <h2 class="font-bold text-red-600 mb-4 text-center">Bottom 10 Petugas (Terendah)</h2>
+                <div id="bottomPetugas" class="text-xs"></div>
+            </div>
+        </div>
+
         <div class="bg-white p-6 rounded-3xl border shadow-sm">
             <div class="flex gap-2 mb-6 overflow-x-auto">
                 <button onclick="switchTab('Kecamatan')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold">Kecamatan</button>
