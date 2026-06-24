@@ -2,9 +2,9 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitoring 1804</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 </head>
 <body class="bg-orange-50 p-6">
@@ -14,10 +14,9 @@
             <p id="updateInfo">Memuat data...</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <select id="fKec" class="p-3 rounded-xl border"><option value="">Semua Kecamatan</option></select>
             <select id="fDesa" class="p-3 rounded-xl border"><option value="">Semua Desa</option></select>
-            <select id="fStat" class="p-3 rounded-xl border"><option value="">Semua Status</option></select>
             <button onclick="resetFilters()" class="bg-red-500 text-white rounded-xl font-bold">RESET FILTER</button>
         </div>
 
@@ -29,16 +28,14 @@
             <div class="flex gap-2 mb-6 overflow-x-auto">
                 <button onclick="switchTab('Kecamatan')" class="tab-btn bg-orange-600 text-white px-4 py-2 rounded-lg font-bold">Kecamatan</button>
                 <button onclick="switchTab('Desa')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold">Desa</button>
-                <button onclick="switchTab('PETUGAS')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold">Petugas</button>
+                <button onclick="switchTab('Petugas')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold">Petugas</button>
                 <button onclick="switchTab('SLS')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold">SLS</button>
             </div>
-            <div class="overflow-x-auto"><table id="mainTable" class="w-full text-xs"></table></div>
+            <table id="mainTable" class="w-full text-xs"></table>
         </div>
     </div>
-
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
