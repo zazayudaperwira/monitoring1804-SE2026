@@ -4,133 +4,137 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monitoring SE2026</title>
-
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 </head>
 
-<body class="bg-slate-100">
+<body class="bg-orange-50 p-5">
 
-<div class="max-w-7xl mx-auto p-6 space-y-6">
+<div class="max-w-7xl mx-auto space-y-5">
 
-<div class="bg-gradient-to-r from-orange-700 to-orange-500 text-white rounded-3xl p-8 shadow-xl">
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-4xl font-black">MONITORING SE2026</h1>
-            <p id="updateInfo">Memuat data...</p>
-        </div>
-        <div class="text-right">
-            <p>Progres Kabupaten</p>
-            <div id="kabProgres" class="text-5xl font-black">0%</div>
-        </div>
-    </div>
+<div class="bg-orange-800 text-white rounded-3xl p-7 shadow">
+<div class="flex justify-between items-center">
+<div>
+<h1 class="text-3xl font-black">MONITORING SE2026</h1>
+<p id="updateInfo">Memuat data...</p>
+</div>
+
+<div class="text-right">
+<p class="text-sm">Progress Kabupaten</p>
+<div id="kabProgres" class="text-4xl font-black">0%</div>
+</div>
+</div>
 </div>
 
 
 <div class="grid md:grid-cols-4 gap-4">
-<div class="bg-white rounded-2xl p-5 shadow">
-<h3 class="text-gray-500">Total SLS</h3>
-<h2 id="totalSLS" class="text-3xl font-bold">-</h2>
-</div>
 
 <div class="bg-white rounded-2xl p-5 shadow">
-<h3 class="text-gray-500">Selesai</h3>
-<h2 id="selesai" class="text-3xl font-bold">-</h2>
+<div>Total SLS</div>
+<div id="totalSLS" class="text-3xl font-bold">-</div>
 </div>
 
 <div class="bg-white rounded-2xl p-5 shadow">
-<h3 class="text-gray-500">Target Harian</h3>
-<h2 id="target" class="text-3xl font-bold">-</h2>
+<div>Selesai</div>
+<div id="totalDone" class="text-3xl font-bold">-</div>
 </div>
 
 <div class="bg-white rounded-2xl p-5 shadow">
-<h3 class="text-gray-500">Update</h3>
-<h2 class="text-xl font-bold">Live</h2>
+<div>Progress</div>
+<div id="progressCard" class="text-3xl font-bold">-</div>
 </div>
+
+<div class="bg-white rounded-2xl p-5 shadow">
+<div>Status Update</div>
+<div class="text-xl font-bold">LIVE</div>
+</div>
+
 </div>
 
 
-<div class="bg-white rounded-3xl p-6 shadow">
+<div class="bg-white p-5 rounded-3xl shadow">
 
 <div class="grid md:grid-cols-3 gap-3">
-<select id="fKec" class="border rounded-xl p-3">
+
+<select id="fKec" class="border p-3 rounded-xl">
 <option value="">Semua Kecamatan</option>
 </select>
 
-<select id="fDesa" class="border rounded-xl p-3">
+<select id="fDesa" class="border p-3 rounded-xl">
 <option value="">Semua Desa</option>
 </select>
 
-<button onclick="resetFilters()" 
-class="bg-red-500 text-white rounded-xl font-bold">
-Reset
+<button onclick="resetFilters()" class="bg-red-500 text-white rounded-xl">
+RESET
 </button>
-</div>
 
 </div>
 
+</div>
 
-<div class="bg-white rounded-3xl p-6 shadow h-[420px]">
+
+<div class="bg-white rounded-3xl shadow p-5 h-96">
 <canvas id="progresChart"></canvas>
 </div>
 
 
-<div class="grid md:grid-cols-3 gap-5">
+<div class="grid md:grid-cols-4 gap-5">
 
-<div class="bg-white rounded-3xl p-5 shadow">
-<h2 class="font-bold text-green-600 mb-3">
+<div class="bg-white rounded-3xl shadow p-5">
+<h3 class="font-bold text-green-600">
 Top Kecamatan
-</h2>
+</h3>
 <div id="topKec"></div>
 </div>
 
-
-<div class="bg-white rounded-3xl p-5 shadow">
-<h2 class="font-bold text-blue-600 mb-3">
+<div class="bg-white rounded-3xl shadow p-5">
+<h3 class="font-bold text-blue-600">
 Top Desa
-</h2>
+</h3>
 <div id="topDesa"></div>
 </div>
 
-
-<div class="bg-white rounded-3xl p-5 shadow">
-<h2 class="font-bold text-orange-600 mb-3">
+<div class="bg-white rounded-3xl shadow p-5">
+<h3 class="font-bold text-orange-600">
 Top PPL
-</h2>
+</h3>
 <div id="topPetugas"></div>
 </div>
 
+<div class="bg-white rounded-3xl shadow p-5">
+<h3 class="font-bold text-red-600">
+Bottom PPL
+</h3>
+<div id="bottomPetugas"></div>
+</div>
+
 </div>
 
 
-<div class="bg-white rounded-3xl p-6 shadow">
+<div class="bg-white rounded-3xl shadow p-5">
 
-<div class="flex gap-2 mb-5">
+<div class="flex gap-2 mb-4 overflow-auto">
 
-<button class="tab-btn px-4 py-2 rounded-xl bg-orange-600 text-white"
-onclick="switchTab('Kecamatan')">
+<button onclick="switchTab('Kecamatan')" class="tab-btn bg-orange-600 text-white px-4 py-2 rounded-xl">
 Kecamatan
 </button>
 
-<button class="tab-btn px-4 py-2 rounded-xl"
-onclick="switchTab('Desa')">
+<button onclick="switchTab('Desa')" class="tab-btn px-4 py-2 rounded-xl">
 Desa
 </button>
 
-<button class="tab-btn px-4 py-2 rounded-xl"
-onclick="switchTab('PETUGAS')">
+<button onclick="switchTab('PETUGAS')" class="tab-btn px-4 py-2 rounded-xl">
 PPL
 </button>
 
-<button class="tab-btn px-4 py-2 rounded-xl"
-onclick="switchTab('SLS')">
+<button onclick="switchTab('SLS')" class="tab-btn px-4 py-2 rounded-xl">
 SLS
 </button>
 
 </div>
 
-<table id="mainTable" class="w-full"></table>
+<table id="mainTable" class="w-full text-xs"></table>
 
 </div>
 
@@ -138,8 +142,8 @@ SLS
 </div>
 
 
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="app.js"></script>
 
 </body>

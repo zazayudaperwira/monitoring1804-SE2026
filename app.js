@@ -1,45 +1,62 @@
-
 const API="https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
 
 let allData={};
 let chart=null;
 
+const STATUS_COLS=[
+"OPEN",
+"DRAFT",
+"SUBMITTED BY Pencacah",
+"REJECTED BY Pengawas",
+"APPROVED BY Pengawas",
+"REVOKED BY Pengawas",
+"SUBMITTED RESPONDENT",
+"EDITED BY Pengawas"
+];
 
-$(async function(){
 
-let res=await fetch(API);
-let json=await res.json();
+$(document).ready(function(){
 
-allData=json.data;
+fetch(API)
+.then(r=>r.json())
+.then(res=>{
 
-$("#updateInfo").text("Update : "+json.metadata.update);
+allData=res.data;
 
+$("#updateInfo").text("Update Terakhir : "+res.metadata.update);
 
 loadFilter();
-
-showKPI();
+updateKPI();
+updateLeaderboard();
 
 switchTab("Kecamatan");
+updateChart();
 
-chartUpdate();
-
-leaderboard();
+});
 
 });
 
 
 
-function showKPI(){
+function updateKPI(){
 
-let kec=allData.Kecamatan;
+let sls=allData.SLS||[];
 
-if(kec){
+$("#totalSLS").text(sls.length);
 
-let d=kec.find(x=>x.Kecamatan==="Lampung Timur");
+let done=sls.reduce((a,b)=>a+Number(b["APPROVED BY Pengawas"]||0),0);
 
-if(d)
-$("#kabProgres")
-.text((d.PROGRES*100).toFixed(1)+"%");
+$("#totalDone").text(done);
+
+if(allData.Kecamatan){
+
+let d=allData.Kecamatan.find(x=>x.Kecamatan==="Lampung Timur");
+
+if(d){
+let p=Number(d.PROGRES)*100;
+$("#kabProgres").text(p.toFixed(1)+"%");
+$("#progressCard").text(p.toFixed(1)+"%");
+}
 
 }
 
@@ -50,13 +67,11 @@ $("#kabProgres")
 function loadFilter(){
 
 [...new Set(allData.Kecamatan.map(x=>x.Kecamatan))]
-.forEach(x=>{
+.forEach(k=>{
 
-$("#fKec").append(
-`<option>${x}</option>`
-)
+$("#fKec").append(`<option>${k}</option>`)
 
-})
+});
 
 }
 
@@ -64,80 +79,70 @@ $("#fKec").append(
 
 $("#fKec").change(function(){
 
-$("#fDesa").html(
-'<option value="">Semua Desa</option>'
-);
-
+$("#fDesa").html('<option value="">Semua Desa</option>');
 
 allData.Desa
 .filter(x=>x.Kecamatan==$(this).val())
-.forEach(x=>{
+.forEach(d=>{
 
-$("#fDesa").append(
-`<option>${x.Desa}</option>`
-)
+$("#fDesa").append(`<option>${d.Desa}</option>`)
+
+});
+
+updateChart();
+
+applyFilters();
 
 });
 
 
-chartUpdate();
+$("#fDesa").change(function(){
+
+updateChart();
+applyFilters();
 
 });
 
-$("#fDesa").change(chartUpdate);
 
 
-
-function chartUpdate(){
-
-let data=allData.SLS;
-
+function updateChart(){
 
 let kec=$("#fKec").val();
 let desa=$("#fDesa").val();
 
-
-data=data.filter(x=>
-(!kec||x.Kecamatan==kec)
-&&
+let data=allData.SLS.filter(x=>
+(!kec||x.Kecamatan==kec)&&
 (!desa||x.Desa==desa)
 );
 
 
-let labels=data.map(x=>x.nmsls);
+let labels=[];
+let datasets=STATUS_COLS.map(x=>({
+label:x,
+data:[]
+}));
 
 
-let values=data.map(x=>
-Object.keys(x)
-.filter(k=>k=="APPROVED BY Pengawas")
-.reduce((a,k)=>a+Number(x[k]||0),0)
-);
+if(kec=="" && desa==""){
 
+labels=["Kabupaten"];
 
-
-if(chart) chart.destroy();
-
-
-chart=new Chart(
-document.getElementById("progresChart"),
-{
-
-type:"bar",
-
-data:{
-labels,
-datasets:[
-{
-label:"Selesai",
-data:values
-}
+datasets.forEach(ds=>{
+ds.data=[
+data.reduce((a,b)=>a+Number(b[ds.label]||0),0)
 ]
-},
+});
 
-options:{
-responsive:true,
-maintainAspectRatio:false
-}
+}else{
+
+labels=[...new Set(data.map(x=>x.Desa))];
+
+datasets.forEach(ds=>{
+
+ds.data=labels.map(l=>
+data.filter(x=>x.Desa==l)
+.reduce((a,b)=>a+Number(b[ds.label]||0),0)
+)
 
 });
 
@@ -145,32 +150,58 @@ maintainAspectRatio:false
 
 
 
-function leaderboard(){
+if(chart)chart.destroy();
 
-makeList(allData.Kecamatan,"topKec");
-makeList(allData.Desa,"topDesa");
-makeList(allData.PETUGAS,"topPetugas");
+chart=new Chart(
+document.getElementById("progresChart"),
+{
+type:"bar",
+data:{labels,datasets},
+options:{
+responsive:true,
+maintainAspectRatio:false,
+scales:{
+x:{stacked:true},
+y:{stacked:true}
+}
+}
+}
+);
 
 }
 
 
-function makeList(arr,id){
 
-if(!arr)return;
+function updateLeaderboard(){
+
+renderRank(allData.Kecamatan,"topKec");
+renderRank(allData.Desa,"topDesa");
+
+let ppl=[...allData.PETUGAS]
+.sort((a,b)=>Number(b["Persentase Progres"])-Number(a["Persentase Progres"]));
+
+renderRank(ppl,"topPetugas");
+
+renderRank(ppl.slice().reverse(),"bottomPetugas");
+
+}
+
+
+
+function renderRank(data,id){
 
 $("#"+id).html(
 
-arr.slice(0,10)
-.map((x,i)=>
-`
-<div class="border-b py-2">
-${i+1}. ${x.Kecamatan||x.Desa||x.PPL}
-</div>
-`
-)
-.join("")
+data.slice(0,10).map((x,i)=>`
 
-)
+<div class="border-b py-2">
+<b>${i+1}</b>
+${x.PPL||x.Desa||x.Kecamatan}
+</div>
+
+`).join("")
+
+);
 
 }
 
@@ -178,15 +209,12 @@ ${i+1}. ${x.Kecamatan||x.Desa||x.PPL}
 
 function switchTab(sheet){
 
-if(!allData[sheet])return;
-
-
-if($.fn.dataTable.isDataTable("#mainTable"))
+if($.fn.DataTable.isDataTable("#mainTable")){
 $("#mainTable").DataTable().destroy();
+}
 
 
-
-new DataTable("#mainTable",{
+$("#mainTable").DataTable({
 
 data:allData[sheet],
 
@@ -205,6 +233,24 @@ scrollX:true
 
 
 
+function applyFilters(){
+
+if($.fn.DataTable.isDataTable("#mainTable")){
+
+$("#mainTable")
+.DataTable()
+.search(
+$("#fKec").val()+" "+
+$("#fDesa").val()
+)
+.draw();
+
+}
+
+}
+
+
+
 function resetFilters(){
 
 $("#fKec").val("");
@@ -212,7 +258,7 @@ $("#fKec").val("");
 $("#fDesa")
 .html('<option value="">Semua Desa</option>');
 
-
-chartUpdate();
+updateChart();
 
 }
+
