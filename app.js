@@ -31,11 +31,12 @@ function updateLeaderboard() {
     let sortedData = [...allData.PETUGAS].sort((a, b) => Number(b.Progres) - Number(a.Progres));
 
     const renderTable = (data, elementId) => {
-        let html = `<table class="w-full text-left"><thead><tr class="border-b"><th class="py-2">Rank</th><th>Petugas</th><th>Progres</th></tr></thead><tbody>`;
+        let html = `<table class="w-full text-left"><thead><tr class="border-b"><th class="py-2">Rank</th><th>Kecamatan</th><th>PPL</th><th>Progres</th></tr></thead><tbody>`;
         data.forEach((d, i) => {
             html += `<tr class="border-b">
                 <td class="py-2 font-bold">${i + 1}</td>
-                <td>${d.Nama}<br><span class="text-[10px] text-gray-500">${d.Kecamatan}</span></td>
+                <td class="text-gray-500">${d.Kecamatan}</td>
+                <td class="font-semibold">${d.PPL}</td>
                 <td class="font-bold">${(Number(d.Progres) * 100).toFixed(1)}%</td>
             </tr>`;
         });
