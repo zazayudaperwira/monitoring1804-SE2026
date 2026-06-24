@@ -1,67 +1,121 @@
-const API="https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
+const API =
+"https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
+
 
 let allData={};
 let chart=null;
 
 
+
 function getProgress(row){
 
-    if(row.PROGRES!==undefined)
-        return Number(row.PROGRES);
+    return Number(
+        row.PROGRES ??
+        row.Progres ??
+        row["Persentase Progres"] ??
+        0
+    );
 
-    if(row.Progres!==undefined)
-        return Number(row.Progres);
-
-    if(row["Persentase Progres"]!==undefined)
-        return Number(row["Persentase Progres"]);
-
-    return 0;
 }
+
 
 
 function persen(row){
 
-    return (getProgress(row)*100).toFixed(1)+"%";
+    return (getProgress(row)*100)
+    .toFixed(1)+"%";
 
 }
+
+
+
 
 
 
 
 $(async function(){
 
-    let res=await fetch(API);
-    let json=await res.json();
 
-    allData=json.data;
-
-
-    $("#updateInfo")
-    .text("Update Terakhir : "+json.metadata.update);
+const res =
+await fetch(API);
 
 
-    let kab=allData.Kecamatan[0];
-
-    if(kab){
-
-        $("#kabProgres")
-        .text(persen(kab));
-
-    }
+const json =
+await res.json();
 
 
-    loadFilter();
+allData=json.data;
 
 
-    updateRanking();
+
+$("#updateInfo")
+.text(
+"Update Terakhir : "+json.metadata.update
+);
 
 
-    switchTab("Kecamatan");
+
+$("#totalSLS")
+.text(
+allData.SLS.length
+);
 
 
-    updateChart();
+
+let selesai =
+allData.SLS.reduce(
+(a,b)=>
+a+
+Number(
+b["APPROVED BY Pengawas"]||0
+),
+0
+);
+
+
+$("#totalDone")
+.text(selesai);
+
+
+
+
+if(allData.Kecamatan.length){
+
+$("#kabProgres")
+.text(
+persen(allData.Kecamatan[0])
+);
+
+
+$("#progressCard")
+.text(
+persen(allData.Kecamatan[0])
+);
+
+}
+
+
+
+
+loadFilter();
+
+
+
+updateRanking();
+
+
+
+switchTab("Kecamatan");
+
+
+
+updateChart();
+
+
 
 });
+
+
 
 
 
@@ -72,24 +126,36 @@ $(async function(){
 function loadFilter(){
 
 
-    let kec=[...new Set(
-        allData.Kecamatan.map(x=>x.Kecamatan)
-    )];
+let kec =
+[
+...new Set(
+allData.Kecamatan
+.map(x=>x.Kecamatan)
+)
+];
 
 
-    kec.forEach(x=>{
 
-        $("#fKec")
-        .append(
-        `<option value="${x}">
-        ${x}
-        </option>`
-        );
+kec.forEach(x=>{
 
-    });
+
+$("#fKec")
+.append(
+`
+<option value="${x}">
+${x}
+</option>
+`
+);
+
+
+});
 
 
 }
+
+
+
 
 
 
@@ -99,25 +165,90 @@ function loadFilter(){
 function updateRanking(){
 
 
-let ppl=[
-...allData.PETUGAS
-]
+
+let kec =
+[...allData.Kecamatan]
 .sort(
-(a,b)=>getProgress(b)-getProgress(a)
+(a,b)=>
+getProgress(b)-getProgress(a)
 );
 
 
 
-renderPPL(
-ppl,
-"topPetugas"
+let desa =
+[...allData.Desa]
+.sort(
+(a,b)=>
+getProgress(b)-getProgress(a)
 );
 
 
 
-renderPPL(
-[...ppl].reverse(),
-"bottomPetugas"
+let petugas =
+[...allData.PETUGAS]
+.sort(
+(a,b)=>
+getProgress(b)-getProgress(a)
+);
+
+
+
+
+
+renderWilayah(
+kec,
+"topKecamatan",
+5,
+"Kecamatan"
+);
+
+
+
+renderWilayah(
+[...kec].reverse(),
+"bottomKecamatan",
+5,
+"Kecamatan"
+);
+
+
+
+
+
+renderWilayah(
+desa,
+"topDesa",
+5,
+"Desa"
+);
+
+
+
+
+renderWilayah(
+[...desa].reverse(),
+"bottomDesa",
+5,
+"Desa"
+);
+
+
+
+
+
+
+renderPetugas(
+petugas,
+"topPetugas",
+10
+);
+
+
+
+renderPetugas(
+[...petugas].reverse(),
+"bottomPetugas",
+10
 );
 
 
@@ -128,33 +259,43 @@ renderPPL(
 
 
 
-function renderPPL(data,id){
 
 
-$("#"+id).html(
 
-data.slice(0,10)
+
+function renderWilayah(
+data,
+id,
+jumlah,
+kolom
+){
+
+
+
+$("#"+id)
+.html(
+
+
+data.slice(0,jumlah)
 .map((x,i)=>{
 
 
 return `
 
-<div class="border-b py-2">
+<div class="border-b py-3">
 
-<b>${i+1}. ${x.PPL}</b>
 
-<br>
+<b>
+${i+1}. ${x[kolom]}
+</b>
 
-<span>
-Kecamatan :
-${x.Kecamatan || "-"}
-</span>
 
 <br>
 
-<span class="text-green-600">
 
-Persentase Progres :
+<span class="text-gray-500">
+
+PROGRES :
 ${persen(x)}
 
 </span>
@@ -162,8 +303,80 @@ ${persen(x)}
 
 </div>
 
+`;
 
-`
+})
+.join("")
+
+
+);
+
+
+
+}
+
+
+
+
+
+
+
+
+
+function renderPetugas(
+data,
+id,
+jumlah
+){
+
+
+
+$("#"+id)
+.html(
+
+
+data.slice(0,jumlah)
+.map((x,i)=>{
+
+
+return `
+
+
+<div class="border-b py-3">
+
+
+<b>
+${i+1}. ${x.PPL}
+</b>
+
+
+<br>
+
+
+<span>
+
+Kecamatan :
+${x.Kecamatan || "-"}
+
+</span>
+
+
+<br>
+
+
+<span class="text-gray-500">
+
+Persentase Progres :
+${persen(x)}
+
+</span>
+
+
+
+</div>
+
+
+`;
 
 
 })
@@ -173,8 +386,8 @@ ${persen(x)}
 );
 
 
-}
 
+}
 
 
 
@@ -187,9 +400,6 @@ ${persen(x)}
 function switchTab(sheet){
 
 
-if(!allData[sheet]) return;
-
-
 
 if(
 $.fn.DataTable.isDataTable("#mainTable")
@@ -197,32 +407,42 @@ $.fn.DataTable.isDataTable("#mainTable")
 
 $("#mainTable")
 .DataTable()
-.clear()
 .destroy();
+
 
 $("#mainTable")
 .empty();
+
 
 }
 
 
 
+let data =
+allData[sheet];
 
-let data=allData[sheet];
+
+
+if(!data || !data.length)
+return;
+
 
 
 
 $("#mainTable")
 .DataTable({
 
-
 data:data,
 
 
 columns:
 
+
 Object.keys(data[0])
-.map(col=>({
+.map(col=>{
+
+
+return {
 
 
 title:col,
@@ -234,6 +454,7 @@ data:col,
 render:function(value){
 
 
+
 if(
 col==="PROGRES" ||
 col==="Progres" ||
@@ -242,10 +463,11 @@ col==="Persentase Progres"
 
 return (
 Number(value)*100
-).toFixed(1)+"%";
-
+)
+.toFixed(1)+"%";
 
 }
+
 
 
 return value;
@@ -254,7 +476,11 @@ return value;
 }
 
 
-})),
+};
+
+
+}),
+
 
 
 pageLength:10,
@@ -269,7 +495,6 @@ ordering:true,
 scrollX:true
 
 
-
 });
 
 
@@ -283,13 +508,17 @@ scrollX:true
 
 
 
+
 function updateChart(){
 
 
-let data=allData.SLS;
+let data =
+allData.SLS;
 
 
-let labels=[
+
+let labels =
+[
 ...new Set(
 data.map(x=>x.Kecamatan)
 )
@@ -297,11 +526,12 @@ data.map(x=>x.Kecamatan)
 
 
 
-let values=labels.map(k=>
+let nilai =
+labels.map(k=>{
 
 
-data.filter(x=>x.Kecamatan===k)
-
+return data
+.filter(x=>x.Kecamatan===k)
 .reduce(
 (a,b)=>
 a+
@@ -309,9 +539,10 @@ Number(
 b["APPROVED BY Pengawas"]||0
 ),
 0
-)
-
 );
+
+
+});
 
 
 
@@ -320,25 +551,47 @@ chart.destroy();
 
 
 
-chart=new Chart(
+
+chart =
+new Chart(
 document.getElementById("progresChart"),
 {
 
+
 type:"bar",
+
 
 data:{
 
+
 labels:labels,
+
 
 datasets:[{
 
 label:"APPROVED BY Pengawas",
 
-data:values
+data:nilai
+
 
 }]
 
+
+},
+
+
+options:{
+
+
+responsive:true,
+
+
+maintainAspectRatio:false
+
+
 }
+
+
 
 }
 
@@ -352,12 +605,25 @@ data:values
 
 
 
+
+
+
+
 function resetFilters(){
 
-$("#fKec").val("");
 
-$("#fDesa").val("");
+$("#fKec")
+.val("");
+
+
+
+$("#fDesa")
+.val("");
+
+
 
 updateChart();
+
+
 
 }
