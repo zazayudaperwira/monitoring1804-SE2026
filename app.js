@@ -126,7 +126,8 @@ function normalizeRowKeys() {
 
 function renderKabupatenSummary() {
     const kecData = globalData["Kecamatan"] || [];
-    const kabRow = kecData.find(r => r["Kecamatan"] && r["Kecamatan"].toString().toLowerCase().includes("lampung timun"));
+    // FIX TYPO: Mengubah "lampung timun" menjadi "lampung timur" agar pembacaan baris total kabupaten berjalan lancar
+    const kabRow = kecData.find(r => r["Kecamatan"] && r["Kecamatan"].toString().toLowerCase().includes("lampung timur"));
     if (kabRow) {
         document.getElementById('kabApproved').innerText = (parseInt(kabRow["APPROVED BY Pengawas"]) || 0).toLocaleString('id-ID');
         let num = parseToPureNumeric(kabRow["_MAPPED_PROGRES"]);
