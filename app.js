@@ -59,11 +59,14 @@ async function loadDashboardWithProgress() {
         globalData = await response.json();
         
         updateProgressBar(60, "Mendownload & Memproses skema data...");
-        if (globalData["Kecamatan"] && globalData["Kecamatan"].length > 0) {
-            let sampleRow = globalData["Kecamatan"][0];
-            let foundTimeKey = Object.keys(sampleRow).find(k => k.toString().includes("KONDISI"));
-            if (foundTimeKey) spreadsheetInfoTime = foundTimeKey.trim();
-        }
+        
+        // Cari info KONDISI waktu data otomatis
+        Object.keys(globalData).forEach(sheet => {
+            if (globalData[sheet] && globalData[sheet].length > 0) {
+                let found = Object.keys(globalData[sheet][0]).find(k => k.toString().toUpperCase().includes("KONDISI"));
+                if (found) spreadsheetInfoTime = found.trim();
+            }
+        });
 
         normalizeRowKeys();
         updateProgressBar(100, "Selesai! Menampilkan data...");
@@ -73,9 +76,8 @@ async function loadDashboardWithProgress() {
             $('#dashboardContent').removeClass('hidden');
             document.getElementById('txtLastUpdate').innerText = spreadsheetInfoTime;
             
-            // Menggunakan proteksi try-catch terisolasi agar kegagalan satu fungsi tidak mematikan fungsi drop-down wilayah
-            try { renderKabupatenSummary(); } catch(e) { console.error("Gagal memuat summary kabupaten:", e); }
-            try { buildWilayahDropdown(); } catch(e) { console.error("Gagal membuat dropdown wilayah:", e); }
+            try { renderKabupatenSummary(); } catch(e) { console.error(e); }
+            try { buildWilayahDropdown(); } catch(e) { console.error(e); }
             
             switchTab(currentTab);
         }, 400);
@@ -85,35 +87,72 @@ async function loadDashboardWithProgress() {
     }
 }
 
+// Fungsi bantu untuk membersihkan teks key kolom agar bisa dicocokkan dengan adil
+function cleanStringKey(str) {
+    if (!str) return "";
+    return str.toString().toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+}
+
+// SMART RE-MAPPING: Menjamin properti objek apa pun formatnya dari GAS akan dipetakan ke Standar Standar UI
 function normalizeRowKeys() {
     Object.keys(globalData).forEach(sheetName => {
         globalData[sheetName] = globalData[sheetName].map(row => {
             let newRow = {};
-            Object.keys(row).forEach(k => { newRow[k.trim()] = row[k]; });
+            
+            // Ambil semua key asli bawaan data baris ini
+            let originalKeys = Object.keys(row);
 
-            let kecKey = Object.keys(newRow).find(k => k.toLowerCase() === "kecamatan");
-            if (kecKey && newRow[kecKey]) {
-                newRow["Kecamatan"] = newRow[kecKey]; 
-                newRow["_CleanKecamatan"] = newRow[kecKey].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
+            // 1. Petakan Status-status Utama Terlebih Dahulu secara Case-Insensitive & Spaceless
+            targetStatus.forEach(status => {
+                let matchedKey = originalKeys.find(k => cleanStringKey(k) === cleanStringKey(status));
+                newRow[status] = matchedKey ? row[matchedKey] : (row[status] || 0);
+            });
+
+            // 2. Petakan kolom-kolom fundamental lainnya
+            let allStandardFields = ["Kecamatan", "Desa", "PML", "PPL", "idsubsls", "nmsls", "jenis", "Keterangan", "Pengawas - Email", "Pencacah - Email", "Only Open", "Only Open [SLS]", "Rank"];
+            allStandardFields.forEach(field => {
+                let matchedKey = originalKeys.find(k => cleanStringKey(k) === cleanStringKey(field));
+                newRow[field] = matchedKey ? row[matchedKey] : (row[field] || "");
+            });
+
+            // Buat clean kecamatan untuk filter dropdown
+            if (newRow["Kecamatan"]) {
+                newRow["_CleanKecamatan"] = newRow["Kecamatan"].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
             } else {
                 newRow["_CleanKecamatan"] = "";
             }
 
-            let progKey = Object.keys(newRow).find(k => ["progres", "PROGRES", "Persentase Progres"].includes(k) || k.toLowerCase().includes("progres"));
-            if (progKey) {
-                newRow["_MAPPED_PROGRES"] = newRow[progKey];
-                newRow["PROGRES"] = newRow[progKey];
-            } else {
-                newRow["_MAPPED_PROGRES"] = "0";
+            // 3. Deteksi Otomatis Kolom Progres Dinamis
+            let progKey = originalKeys.find(k => {
+                let ck = cleanStringKey(k);
+                return ck.includes("progres") || ck.includes("persentase");
+            });
+            let rawProgVal = progKey ? row[progKey] : 0;
+            newRow["_MAPPED_PROGRES"] = rawProgVal;
+            newRow["PROGRES"] = rawProgVal;
+            newRow["Persentase Progres"] = rawProgVal;
+
+            // 4. Deteksi Otomatis Kolom Target Harian Dinamis (Bebas dari pengaruh tanggal)
+            let targetKey = originalKeys.find(k => {
+                let ck = cleanStringKey(k);
+                return ck.includes("target") || ck.includes("harian");
+            });
+            let rawTargetVal = targetKey ? row[targetKey] : 0;
+            newRow["_MAPPED_TARGET"] = rawTargetVal;
+            newRow["Target Harian"] = rawTargetVal;
+            
+            // Simpan nama kolom target asli (misal "Target Harian 23-06-2026") agar judul tabel dinamis bisa mengikutinya
+            if (targetKey) {
+                newRow["_ORIGINAL_TARGET_NAME"] = targetKey;
+                newRow[targetKey] = rawTargetVal;
             }
 
-            let targetKey = Object.keys(newRow).find(k => k.toLowerCase().includes("target") || k.toLowerCase().includes("harian"));
-            if (targetKey) {
-                newRow["_MAPPED_TARGET"] = newRow[targetKey];
-                newRow["Target Harian"] = newRow[targetKey];
-            } else {
-                newRow["_MAPPED_TARGET"] = "0";
-            }
+            // Copy sisa properti lain yang tidak tercover agar tidak hilang
+            originalKeys.forEach(k => {
+                if (!newRow.hasOwnProperty(k)) {
+                    newRow[k] = row[k];
+                }
+            });
 
             return newRow;
         });
@@ -124,7 +163,6 @@ function renderKabupatenSummary() {
     const kecData = globalData["Kecamatan"] || [];
     if (kecData.length === 0) return;
     
-    // Mencari baris total secara fleksibel
     const kabRow = kecData.find(r => r["Kecamatan"] && (
         r["Kecamatan"].toString().toLowerCase().includes("lampung timur") || 
         r["Kecamatan"].toString().toLowerCase().includes("total")
@@ -137,16 +175,13 @@ function renderKabupatenSummary() {
     }
 }
 
-// FIX UTAMA: Pembangunan dropdown mengambil data secara defensif dari semua baris alternatif yang valid
 function buildWilayahDropdown() {
     const select = $('#filterWilayah');
     const currVal = select.val();
     select.find('option:not(:first)').remove();
     
     let addedKec = new Set();
-    
-    // Ambil basis data referensi dari tab Kecamatan atau Desa yang tersedia
-    let sourceData = globalData["Kecamatan"] || globalData["Desa"] || globalData["PETUGAS"] || [];
+    let sourceData = globalData["Kecamatan"] || globalData["Desa"] || [];
 
     sourceData.forEach(row => {
         let clean = row["_CleanKecamatan"];
@@ -154,7 +189,6 @@ function buildWilayahDropdown() {
         
         if (raw && clean && clean !== "") {
             let rawStr = raw.toString().toLowerCase();
-            // Eliminasi kata kunci total kabupaten agar tidak ikut masuk list dropdown filter
             if (!rawStr.includes("lampung timur") && !rawStr.includes("total") && !rawStr.includes("kabupaten") && !addedKec.has(clean)) {
                 select.append(`<option value="${clean}">${raw}</option>`);
                 addedKec.add(clean);
@@ -189,6 +223,7 @@ function buildDataTableStructure() {
         $('#mainDataTable').empty();
     }
 
+    // Filter baris total kabupaten agar tidak mengotori tabel utama
     let processedData = rawSheetData.filter(r => {
         let firstVal = r["Kecamatan"] || Object.values(r)[0] || "";
         let txt = firstVal.toString().toLowerCase();
@@ -196,35 +231,46 @@ function buildDataTableStructure() {
     });
 
     let sampleRow = processedData[0] || {};
-    let realProgKey = Object.keys(sampleRow).find(k => k.toLowerCase().includes("progres") && !k.startsWith("_")) || "PROGRES";
-    let realTargetKey = Object.keys(sampleRow).find(k => (k.toLowerCase().includes("target") || k.toLowerCase().includes("harian")) && !k.startsWith("_")) || "Target Harian";
-    let realRankKey = Object.keys(sampleRow).find(k => k.toLowerCase() === "rank") || "Rank";
+    
+    // Cari penamaan kolom riil dari data
+    let realProgKey = "PROGRES";
+    let realTargetKey = sampleRow["_ORIGINAL_TARGET_NAME"] || "Target Harian";
 
     let dynamicColumns = [...(baseColumnsConfig[currentTab] || [])];
     
     if (currentTab !== "SLS") {
         if (!dynamicColumns.includes(realProgKey)) dynamicColumns.push(realProgKey);
         if (!dynamicColumns.includes(realTargetKey)) dynamicColumns.push(realTargetKey);
-        if (currentTab === "PETUGAS" && !dynamicColumns.includes(realRankKey)) dynamicColumns.push(realRankKey);
     }
 
     const columnsConfig = dynamicColumns.map(colName => {
+        // Tampilkan judul kolom target secara dinamis sesuai tanggal sheet asli
+        let displayTitle = colName;
+        if (colName === "Target Harian" && sampleRow["_ORIGINAL_TARGET_NAME"]) {
+            displayTitle = sampleRow["_ORIGINAL_TARGET_NAME"];
+        }
+
         return {
-            title: colName,
+            title: displayTitle,
             data: colName,
-            defaultContent: "-",
+            defaultContent: "0",
             render: function(data, type, row) {
-                if (data === undefined || data === null || data === "") return "-";
+                // Gunakan backup mapper jika pemanggilan langsung mengembalikan nilai kosong
+                let finalVal = data;
+                if (colName === "PROGRES") finalVal = row["_MAPPED_PROGRES"];
+                if (colName === realTargetKey || colName === "Target Harian") finalVal = row["_MAPPED_TARGET"];
+
+                if (finalVal === undefined || finalVal === null || finalVal === "") return "0";
                 
-                if (colName === realProgKey || colName === realTargetKey) {
-                    let num = parseToPureNumeric(data);
+                if (colName === "PROGRES" || colName === "Target Harian" || colName === realTargetKey) {
+                    let num = parseToPureNumeric(finalVal);
                     return num.toFixed(2) + "%";
                 }
                 
-                if (type === 'display' && !isNaN(data) && colName !== "idsubsls" && !colName.toLowerCase().includes("date") && !colName.toLowerCase().includes("rank")) {
-                    return Number(data).toLocaleString('id-ID');
+                if (type === 'display' && !isNaN(finalVal) && colName !== "idsubsls" && !colName.toLowerCase().includes("email") && !colName.toLowerCase().includes("rank")) {
+                    return Number(finalVal).toLocaleString('id-ID');
                 }
-                return data;
+                return finalVal;
             }
         };
     });
@@ -271,8 +317,8 @@ function generateTopBottomPplHighlight(cleanWilayah) {
     let petugasData = globalData["PETUGAS"] || [];
     if (cleanWilayah) {
         petugasData = petugasData.filter(r => {
-            if (!r["Kecamatan"]) return false;
-            return r["Kecamatan"].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim().toLowerCase().includes(cleanWilayah.toLowerCase());
+            if (!r["_CleanKecamatan"]) return false;
+            return r["_CleanKecamatan"].toLowerCase().includes(cleanWilayah.toLowerCase());
         });
     }
 
@@ -319,8 +365,8 @@ function renderDinamisChart(cleanWilayah) {
 
     if (cleanWilayah) {
         filtered = filtered.filter(r => {
-            if (!r["Kecamatan"]) return false;
-            return r["Kecamatan"].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim().toLowerCase().includes(cleanWilayah.toLowerCase());
+            if (!r["_CleanKecamatan"]) return false;
+            return r["_CleanKecamatan"].toLowerCase().includes(cleanWilayah.toLowerCase());
         });
     }
 
