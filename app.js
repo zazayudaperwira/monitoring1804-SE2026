@@ -10,17 +10,13 @@ $(document).ready(function() {
         $('#progressContainer').hide();
         $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
         
+        // Perbaikan Progres Kabupaten menggunakan kunci PROGRES
         const kabData = allData.Kecamatan.find(d => d.Kecamatan === "Lampung Timur");
-        if(kabData) $('#kabProgres').text((Number(kabData.Progres) * 100).toFixed(1) + "%");
+        if(kabData) $('#kabProgres').text((Number(kabData.PROGRES) * 100).toFixed(1) + "%");
         
         [...new Set(allData.Kecamatan.map(d => d.Kecamatan))].forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
         
-        // Inisialisasi DataTable sekali saja di awal
-        $('#mainTable').DataTable({ 
-            data: [], 
-            columns: [], 
-            scrollX: true 
-        });
+        $('#mainTable').DataTable({ data: [], columns: [], scrollX: true });
 
         switchTab('Kecamatan');
         updateChart();
@@ -30,11 +26,12 @@ $(document).ready(function() {
 
 function updateLeaderboard() {
     if (!allData.PETUGAS) return;
-    let sortedData = [...allData.PETUGAS].sort((a, b) => Number(b['Persentase Progres']) - Number(a['Persentase Progres']));
+    // Menggunakan kunci PROGRES sesuai data Anda
+    let sortedData = [...allData.PETUGAS].sort((a, b) => Number(b.PROGRES) - Number(a.PROGRES));
     const renderTable = (data, elementId) => {
         let html = `<table class="w-full text-left"><thead><tr class="border-b"><th class="py-2">Rank</th><th>Kecamatan</th><th>PPL</th><th>Progres</th></tr></thead><tbody>`;
         data.forEach((d, i) => {
-            html += `<tr class="border-b"><td class="py-2 font-bold">${i+1}</td><td class="text-[10px]">${d.Kecamatan}</td><td class="font-semibold text-xs">${d.PPL}</td><td class="font-bold">${(Number(d['Persentase Progres'])*100).toFixed(1)}%</td></tr>`;
+            html += `<tr class="border-b"><td class="py-2 font-bold">${i+1}</td><td class="text-[10px]">${d.Kecamatan}</td><td class="font-semibold text-xs">${d.PPL}</td><td class="font-bold">${(Number(d.PROGRES)*100).toFixed(1)}%</td></tr>`;
         });
         $(`#${elementId}`).html(html + `</tbody></table>`);
     };
@@ -75,8 +72,6 @@ function switchTab(sheet) {
     
     const table = $('#mainTable').DataTable();
     table.clear().columns().destroy();
-    table.settings()[0].aoColumns = []; 
-    
     table.settings()[0].aoColumns = Object.keys(allData[sheet][0]).map(k => ({ title: k, data: k }));
     table.columns.adjust().draw();
     table.rows.add(allData[sheet]).draw();
