@@ -1,113 +1,67 @@
-const API = "https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
-let allData = {};
-let chart = null;
-let filterTimeout = null;
-const STATUS_COLS = ["OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas", "APPROVED BY Pengawas", "REVOKED BY Pengawas", "SUBMITTED RESPONDENT", "EDITED BY Pengawas"];
+const API="https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
+let allData={};
 
-$(document).ready(function() {
-    // Inisialisasi DataTable kosong di awal agar ada referensi tabel
-    $('#mainTable').DataTable({ data: [], columns: [] });
+function p(x){
+return Number(x.PROGRES??x.Progres??x["Persentase Progres"]??0);
+}
+function pct(x){return (p(x)*100).toFixed(1)+"%";}
 
-    fetch(API).then(res => res.json()).then(res => {
-        allData = res.data;
-        $('#progressContainer').hide();
-        $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
-        
-        const kabData = allData.Kecamatan.find(d => d.Kecamatan === "Lampung Timur");
-        if(kabData) $('#kabProgres').text((Number(kabData.PROGRES) * 100).toFixed(1) + "%");
-        
-        [...new Set(allData.Kecamatan.map(d => d.Kecamatan))].forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
-        
-        switchTab('Kecamatan');
-        updateChart();
-        updateLeaderboard(); 
-    });
+$(async()=>{
+let j=await (await fetch(API)).json();
+allData=j.data;
+
+$("#updateInfo").text("Update : "+j.metadata.update);
+$("#totalSLS").text(allData.SLS.length);
+$("#totalDone").text(allData.SLS.reduce((a,b)=>a+Number(b["APPROVED BY Pengawas"]||0),0));
+$("#progressCard").text(pct(allData.Kecamatan[0]));
+
+rank();
+switchTab("Kecamatan");
 });
 
-function switchTab(sheet) {
-    if (!allData[sheet]) return;
-    
-    // Update tombol
-    $('.tab-btn').removeClass('bg-orange-600 text-white').addClass('bg-orange-100 text-orange-700');
-    $(`button[onclick="switchTab('${sheet}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
-    
-    const table = $('#mainTable').DataTable();
-    
-    // 1. Bersihkan data lama
-    table.clear();
-    
-    // 2. Buat kolom baru berdasarkan data sheet yang dipilih
-    let cols = Object.keys(allData[sheet][0]).map(k => ({
-        title: k,
-        data: k,
-        render: (data) => (k.toUpperCase().includes('PROGRES') && typeof data === 'number') ? (data * 100).toFixed(1) + '%' : data
-    }));
-    
-    // 3. Update struktur tabel dengan kolom baru
-    table.destroy();
-    $('#mainTable').empty();
-    $('#mainTable').DataTable({
-        data: allData[sheet],
-        columns: cols,
-        scrollX: true
-    });
-    
-    applyFilters();
+function rank(){
+
+let kec=[...allData.Kecamatan].sort((a,b)=>p(b)-p(a));
+let desa=[...allData.Desa].sort((a,b)=>p(b)-p(a));
+let ppl=[...allData.PETUGAS].sort((a,b)=>p(b)-p(a));
+
+draw(kec,"topKec");
+draw(desa,"topDesa");
+drawPpl(ppl,"topPetugas");
+drawPpl([...ppl].reverse(),"bottomPetugas");
+
 }
 
-function updateLeaderboard() {
-    if (!allData.PETUGAS) return;
-    let sortedData = [...allData.PETUGAS].sort((a, b) => Number(b.PROGRES) - Number(a.PROGRES));
-    const renderTable = (data, elementId) => {
-        let html = `<table class="w-full text-left"><thead><tr class="border-b"><th class="py-2">Rank</th><th>Kecamatan</th><th>PPL</th><th>Progres</th></tr></thead><tbody>`;
-        data.forEach((d, i) => {
-            html += `<tr class="border-b"><td class="py-2 font-bold">${i+1}</td><td class="text-[10px]">${d.Kecamatan}</td><td class="font-semibold text-xs">${d.PPL}</td><td class="font-bold">${(Number(d.PROGRES)*100).toFixed(1)}%</td></tr>`;
-        });
-        $(`#${elementId}`).html(html + `</tbody></table>`);
-    };
-    renderTable(sortedData.slice(0, 10), 'topPetugas');
-    renderTable(sortedData.slice(-10).reverse(), 'bottomPetugas');
+function draw(a,id){
+$("#"+id).html(a.slice(0,10).map((x,i)=>`
+<div class="border-b py-2">
+<b>${i+1}</b> ${x.Kecamatan||x.Desa}<br>
+PROGRES : ${pct(x)}
+</div>`).join(""));
 }
 
-function updateChart() {
-    clearTimeout(filterTimeout);
-    filterTimeout = setTimeout(() => {
-        if (!allData.SLS) return;
-        const kec = $('#fKec').val();
-        const desa = $('#fDesa').val();
-        let filteredData = allData.SLS.filter(d => (kec === "" || d.Kecamatan.includes(kec)) && (desa === "" || d.Desa.includes(desa)));
-        let labels = [], datasets = STATUS_COLS.map((col, i) => ({ label: col, data: [], backgroundColor: `hsl(${(i * 45)}, 70%, 60%)` }));
-
-        if (kec === "") {
-            labels = ["Kabupaten"];
-            datasets.forEach(ds => ds.data = [filteredData.reduce((sum, d) => sum + (Number(d[ds.label]) || 0), 0)]);
-        } else if (desa === "") {
-            labels = allData.Desa.filter(d => d.Kecamatan === kec).map(d => d.Desa);
-            datasets.forEach(ds => ds.data = labels.map(dName => filteredData.filter(d => d.Desa === dName).reduce((sum, d) => sum + (Number(d[ds.label]) || 0), 0)));
-        } else {
-            const desaSLS = filteredData.filter(d => d.Desa === desa);
-            labels = desaSLS.map(d => d.nmsls);
-            datasets.forEach(ds => ds.data = desaSLS.map(d => Number(d[ds.label]) || 0));
-        }
-
-        if(chart) chart.destroy();
-        chart = new Chart(document.getElementById('progresChart').getContext('2d'), { type: 'bar', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } } });
-    }, 100);
+function drawPpl(a,id){
+$("#"+id).html(a.slice(0,10).map((x,i)=>`
+<div class="border-b py-2">
+<b>${i+1}</b> ${x.PPL}<br>
+${x.Kecamatan||""}<br>
+Persentase Progres : ${pct(x)}
+</div>`).join(""));
 }
 
-function applyFilters() {
-    const table = $('#mainTable').DataTable();
-    table.search(`${$('#fKec').val()} ${$('#fDesa').val()}`.trim()).draw();
-}
+function switchTab(sheet){
 
-$('#fKec').change(function() { 
-    $('#fDesa').html('<option value="">Semua Desa</option>');
-    allData.Desa.filter(d => d.Kecamatan === $(this).val()).forEach(d => $('#fDesa').append(`<option value="${d.Desa}">${d.Desa}</option>`));
-    updateChart(); applyFilters();
+if($.fn.DataTable.isDataTable("#mainTable"))
+$("#mainTable").DataTable().destroy();
+
+let d=allData[sheet];
+
+$("#mainTable").DataTable({
+data:d,
+columns:Object.keys(d[0]).map(k=>({title:k,data:k})),
+searching:true,
+ordering:true,
+scrollX:true
 });
-$('#fDesa').change(() => { applyFilters(); updateChart(); });
 
-function resetFilters() {
-    $('#fKec').val(""); $('#fDesa').html('<option value="">Semua Desa</option>').val("");
-    updateChart(); applyFilters();
 }
