@@ -1,5 +1,5 @@
 // GANTI TAUTAN INI dengan URL Web App hasil Deploy Apps Script Anda nanti
-const API_URL = "https://script.google.com/macros/s/AKfycbz...KODE_DEPLOY_ANDA.../exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzsYmYcYzFex67e7t29ATnQcnPCqOcZG-3hOwdGT5E9UyWT12XSm3chW-llsoGGLdpx/exec";
 
 let chartInstanceStatus = null;
 let chartInstancePetugas = null;
