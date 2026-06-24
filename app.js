@@ -25,7 +25,6 @@ function loadFromAPI() {
 function processData(res) {
     allData = res.data;
     $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
-    // Pastikan data Kecamatan ada sebelum mengisi dropdown
     if (allData.Kecamatan) {
         const kecs = [...new Set(allData.Kecamatan.map(d => d.Kecamatan))];
         kecs.forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
@@ -33,7 +32,6 @@ function processData(res) {
     switchTab('Kecamatan');
 }
 
-// Event Filter
 $('#fKec').change(function() { filterState.kec = $(this).val(); filterState.desa = ""; updateDesaDropdown(); applyFilters(); });
 $('#fDesa').change(function() { filterState.desa = $(this).val(); applyFilters(); });
 $('#fStat').change(function() { filterState.stat = $(this).val(); applyFilters(); });
@@ -52,10 +50,7 @@ function applyFilters() {
 }
 
 function switchTab(sheet) {
-    if (!allData[sheet]) {
-        console.error("Data tab " + sheet + " kosong!");
-        return;
-    }
+    if (!allData[sheet] || allData[sheet].length === 0) return;
 
     $('.tab-btn').removeClass('bg-orange-600 text-white').addClass('bg-orange-100 text-orange-700');
     $(`button[onclick="switchTab('${sheet}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
@@ -64,16 +59,19 @@ function switchTab(sheet) {
         $('#mainTable').DataTable().destroy();
         $('#mainTable').empty();
     }
-    
-    // Perbaikan SLS: Mendapatkan kunci kolom secara dinamis
-    const columns = Object.keys(allData[sheet][0]).map(k => ({ title: k, data: k }));
-    
+
+    // Perbaikan SLS: Mengambil header dari objek pertama yang valid
+    const firstRow = allData[sheet][0];
+    const columns = Object.keys(firstRow).map(k => ({ title: k, data: k }));
+
     $('#mainTable').DataTable({
         data: allData[sheet],
         columns: columns,
         scrollX: true,
-        deferRender: true, 
+        deferRender: true,
         destroy: true,
-        initComplete: () => applyFilters()
+        initComplete: function() {
+            applyFilters();
+        }
     });
 }
