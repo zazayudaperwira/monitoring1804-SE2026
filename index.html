@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitoring Evaluasi Lapangan 1804</title>
     
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css">
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -23,21 +23,15 @@
         table.dataTable thead th { background-color: #f1f5f9; color: #1e293b; font-weight: 700; border: 1px solid #cbd5e1 !important; text-align: center; padding: 6px 8px; }
         table.dataTable td { border: 1px solid #e2e8f0 !important; padding: 6px 8px !important; }
         .dataTables_wrapper .dataTables_paginate .paginate_button.current { background: #2563eb !important; color: white !important; border: none !important; border-radius: 0.375rem; }
-        /* Baris tidak tercapai target */
-        .row-target-failed { background-color: #fef2f2 !important; color: #dc2626 !important; font-weight: 500; }
-        .row-target-failed td { color: #dc2626 !important; border-color: #fee2e2 !important; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
 
     <nav class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center py-3 gap-3">
-            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <div class="flex items-center gap-2">
                 <span class="text-sm font-bold text-blue-700 tracking-wider uppercase">📊 MONITORING EVALUASI 1804</span>
-                <div class="flex flex-wrap gap-1.5 items-center">
-                    <span id="txtLastUpdate" class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full font-semibold">Memuat waktu data...</span>
-                    <span id="txtSyncTimer" class="text-[10px] text-slate-500 bg-slate-100 px-2 py-1 rounded-full">Auto-Sync: 05:00</span>
-                </div>
+                <span id="txtLastUpdate" class="text-[10px] text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full font-medium">Syncing...</span>
             </div>
             
             <div class="flex flex-wrap items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
@@ -100,42 +94,6 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-                    <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-                        <h3 class="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">🏆 10 PPL Progres Tertinggi</h3>
-                        <span class="text-[10px] text-slate-400 font-medium">Berdasarkan Filter</span>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs">
-                            <thead>
-                                <tr class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200"><th class="p-2 text-center">No</th><th class="p-2">Nama PPL (Kecamatan)</th><th class="p-2 text-center">Progres</th></tr>
-                            </thead>
-                            <tbody id="topPplList" class="divide-y divide-slate-100">
-                                <tr><td colspan="3" class="p-3 text-center text-slate-400">Loading ranking...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-                    <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-                        <h3 class="text-xs font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1">⚠️ 10 PPL Progres Terendah</h3>
-                        <span class="text-[10px] text-slate-400 font-medium">Berdasarkan Filter</span>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs">
-                            <thead>
-                                <tr class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200"><th class="p-2 text-center">No</th><th class="p-2">Nama PPL (Kecamatan)</th><th class="p-2 text-center">Progres</th></tr>
-                            </thead>
-                            <tbody id="bottomPplList" class="divide-y divide-slate-100">
-                                <tr><td colspan="3" class="p-3 text-center text-slate-400">Loading ranking...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div class="flex border-b border-slate-200 bg-slate-50 p-1.5 gap-1 overflow-x-auto">
                     <button onclick="switchTab('Kecamatan')" id="btn-Kecamatan" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md bg-blue-600 text-white shadow-sm">Kecamatan</button>
@@ -143,6 +101,7 @@
                     <button onclick="switchTab('PETUGAS')" id="btn-PETUGAS" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md text-slate-600 hover:bg-slate-200">Petugas</button>
                     <button onclick="switchTab('SLS')" id="btn-SLS" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md text-slate-600 hover:bg-slate-200">SLS</button>
                 </div>
+
                 <div class="p-4">
                     <table id="mainDataTable" class="display cell-border compact stripe w-full text-slate-700"></table>
                 </div>
@@ -151,6 +110,6 @@
         </div>
     </main>
 
-    <script src="app.js?v=10.0"></script>
+    <script src="app.js?v=7.0"></script>
 </body>
 </html>
