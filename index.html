@@ -10,16 +10,20 @@
 </head>
 <body class="bg-orange-50 p-6">
     <div class="max-w-7xl mx-auto space-y-6">
+        <div id="progressContainer" class="w-full bg-gray-200 rounded-full h-2.5">
+            <div id="progressBar" class="bg-orange-600 h-2.5 rounded-full" style="width: 0%"></div>
+        </div>
+
         <div class="bg-orange-600 p-8 rounded-3xl text-white shadow-lg">
             <h1 class="text-3xl font-black">MONITORING 1804</h1>
-            <p id="updateInfo">Memuat data...</p>
+            <p id="updateInfo" class="opacity-80">Memuat data...</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <select id="fKec" class="p-3 rounded-xl border"><option value="">Semua Kecamatan</option></select>
             <select id="fDesa" class="p-3 rounded-xl border"><option value="">Semua Desa</option></select>
             <select id="fStat" class="p-3 rounded-xl border"><option value="">Semua Status</option></select>
-            <button onclick="resetFilters()" class="bg-red-500 text-white rounded-xl font-bold">RESET FILTER</button>
+            <button onclick="resetFilters()" class="bg-red-500 text-white rounded-xl font-bold hover:bg-red-600">RESET FILTER</button>
         </div>
 
         <div class="bg-white p-6 rounded-3xl border shadow-sm h-96">
@@ -28,7 +32,7 @@
 
         <div class="bg-white p-6 rounded-3xl border shadow-sm">
             <div class="flex gap-2 mb-6 overflow-x-auto">
-                <button onclick="switchTab('Kecamatan')" class="tab-btn bg-orange-600 text-white px-4 py-2 rounded-lg font-bold">Kecamatan</button>
+                <button onclick="switchTab('Kecamatan')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold">Kecamatan</button>
                 <button onclick="switchTab('Desa')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold">Desa</button>
                 <button onclick="switchTab('PETUGAS')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold">Petugas</button>
                 <button onclick="switchTab('SLS')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold">SLS</button>
