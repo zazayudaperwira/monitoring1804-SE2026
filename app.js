@@ -1,7 +1,6 @@
 const API = "https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
 let allData = {};
 let chart = null;
-
 const STATUS_COLS = ["OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas", "APPROVED BY Pengawas", "REVOKED BY Pengawas", "SUBMITTED RESPONDENT", "EDITED BY Pengawas"];
 
 $(document).ready(function() {
@@ -21,14 +20,12 @@ function updateChart() {
     const desa = $('#fDesa').val();
     let labels = [], datasets = [];
 
-    // DRILL-DOWN LOGIC
     if (kec === "") {
         labels = STATUS_COLS;
         let totals = STATUS_COLS.map(col => allData.SLS.reduce((sum, d) => sum + (Number(d[col]) || 0), 0));
         datasets = [{ label: 'Total Kabupaten', data: totals, backgroundColor: '#ea580c' }];
     } else if (desa === "") {
-        const kecDesas = allData.Desa.filter(d => d.Kecamatan === kec).map(d => d.Desa);
-        labels = kecDesas;
+        labels = allData.Desa.filter(d => d.Kecamatan === kec).map(d => d.Desa);
         datasets = STATUS_COLS.map((col, i) => ({
             label: col,
             data: labels.map(desaName => allData.SLS.filter(d => d.Desa === desaName).reduce((sum, d) => sum + (Number(d[col]) || 0), 0)),
@@ -54,12 +51,22 @@ function updateChart() {
 
 function switchTab(sheet) {
     if (!allData[sheet]) return;
+    $('.tab-btn').removeClass('bg-orange-600 text-white').addClass('bg-orange-100 text-orange-700');
+    $(`button[onclick="switchTab('${sheet}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
+    
     if ($.fn.DataTable.isDataTable('#mainTable')) { $('#mainTable').DataTable().destroy(); $('#mainTable').empty(); }
-    $('#mainTable').DataTable({ data: allData[sheet], columns: Object.keys(allData[sheet][0]).map(k => ({ title: k, data: k })), scrollX: true, destroy: true });
+    $('#mainTable').DataTable({ 
+        data: allData[sheet], 
+        columns: Object.keys(allData[sheet][0]).map(k => ({ title: k, data: k })), 
+        scrollX: true, 
+        destroy: true,
+        initComplete: () => applyFilters() 
+    });
 }
 
 function applyFilters() {
-    $('#mainTable').DataTable().search(`${$('#fKec').val()} ${$('#fDesa').val()} ${$('#fStat').val()}`.trim()).draw();
+    const table = $('#mainTable').DataTable();
+    table.search(`${$('#fKec').val()} ${$('#fDesa').val()} ${$('#fStat').val()}`.trim()).draw();
 }
 
 $('#fKec').change(function() { 
@@ -68,8 +75,7 @@ $('#fKec').change(function() {
     updateChart(); applyFilters();
 });
 
-$('#fDesa').change(() => { updateChart(); applyFilters(); });
-$('#fStat').change(() => applyFilters());
+$('#fDesa, #fStat').change(() => { updateChart(); applyFilters(); });
 
 function resetFilters() {
     $('#fKec').val(""); $('#fDesa').html('<option value="">Semua Desa</option>').val(""); $('#fStat').val("");
