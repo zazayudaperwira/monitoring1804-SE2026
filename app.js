@@ -23,8 +23,7 @@ function loadFromAPI() {
 function processData(res) {
     allData = res.data;
     $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
-    // Membersihkan spasi pada data untuk memastikan kesamaan
-    const kecs = [...new Set(allData.Kecamatan.map(d => d.Kecamatan.trim()))];
+    const kecs = [...new Set(allData.Kecamatan.map(d => d.Kecamatan))];
     kecs.forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
     switchTab('Kecamatan');
 }
@@ -36,20 +35,17 @@ $('#fStat').change(function() { filterState.stat = $(this).val(); applyFilters()
 function updateDesaDropdown() {
     $('#fDesa').html('<option value="">Semua Desa</option>');
     if (filterState.kec && allData.Desa) {
-        const desas = allData.Desa.filter(d => d.Kecamatan.trim() === filterState.kec);
+        const desas = allData.Desa.filter(d => d.Kecamatan === filterState.kec);
         desas.forEach(d => $('#fDesa').append(`<option value="${d.Desa}">${d.Desa}</option>`));
     }
 }
 
 function applyFilters() {
     const t = $('#mainTable').DataTable();
-    // Menggunakan regex ^...$ untuk pencocokan exact match yang sudah di-trim
-    const filterKec = filterState.kec ? `^${$.fn.DataTable.util.escapeRegex(filterState.kec)}$` : "";
-    const filterDesa = filterState.desa ? `^${$.fn.DataTable.util.escapeRegex(filterState.desa)}$` : "";
-    
-    t.column('Kecamatan:name').search(filterKec, true, false)
-     .column('Desa:name').search(filterDesa, true, false)
-     .draw();
+    // Gunakan pencarian global untuk memastikan data ditemukan
+    // Kita kombinasikan teks dari dropdown untuk dicari di seluruh kolom tabel
+    const query = (filterState.kec ? filterState.kec : "") + " " + (filterState.desa ? filterState.desa : "");
+    t.search(query).draw();
 }
 
 function switchTab(sheet) {
@@ -63,17 +59,13 @@ function switchTab(sheet) {
     }
 
     const keys = Object.keys(allData[sheet][0]);
-    const columns = keys.map(k => ({ title: k, data: k, name: k }));
+    const columns = keys.map(k => ({ title: k, data: k }));
 
     $('#mainTable').DataTable({
         data: allData[sheet],
         columns: columns,
         scrollX: true,
         deferRender: true,
-        destroy: true,
-        initComplete: function() {
-            // Pembersihan data saat tabel dimuat
-            applyFilters();
-        }
+        destroy: true
     });
 }
