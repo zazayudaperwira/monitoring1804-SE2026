@@ -13,22 +13,19 @@ $(document).ready(function() {
 });
 
 function loadFromAPI() {
-    let p = 0;
-    const i = setInterval(() => { p += 10; $('#progress-bar').css('width', p + '%'); $('#perc').text(p); if (p >= 90) clearInterval(i); }, 150);
     fetch(API).then(res => res.json()).then(res => {
         localStorage.setItem('dashboardData', JSON.stringify(res));
         processData(res);
-        $('#progress-bar').css('width', '100%'); $('#perc').text(100); $('#loader').fadeOut(500);
+        $('#loader').fadeOut(500);
     });
 }
 
 function processData(res) {
     allData = res.data;
     $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
-    if (allData.Kecamatan) {
-        const kecs = [...new Set(allData.Kecamatan.map(d => d.Kecamatan))];
-        kecs.forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
-    }
+    // Membersihkan spasi pada data untuk memastikan kesamaan
+    const kecs = [...new Set(allData.Kecamatan.map(d => d.Kecamatan.trim()))];
+    kecs.forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
     switchTab('Kecamatan');
 }
 
@@ -39,19 +36,24 @@ $('#fStat').change(function() { filterState.stat = $(this).val(); applyFilters()
 function updateDesaDropdown() {
     $('#fDesa').html('<option value="">Semua Desa</option>');
     if (filterState.kec && allData.Desa) {
-        const desas = allData.Desa.filter(d => d.Kecamatan === filterState.kec);
+        const desas = allData.Desa.filter(d => d.Kecamatan.trim() === filterState.kec);
         desas.forEach(d => $('#fDesa').append(`<option value="${d.Desa}">${d.Desa}</option>`));
     }
 }
 
 function applyFilters() {
     const t = $('#mainTable').DataTable();
-    t.column(0).search(filterState.kec).column(1).search(filterState.desa).column(2).search(filterState.stat).draw();
+    // Menggunakan regex ^...$ untuk pencocokan exact match yang sudah di-trim
+    const filterKec = filterState.kec ? `^${$.fn.DataTable.util.escapeRegex(filterState.kec)}$` : "";
+    const filterDesa = filterState.desa ? `^${$.fn.DataTable.util.escapeRegex(filterState.desa)}$` : "";
+    
+    t.column('Kecamatan:name').search(filterKec, true, false)
+     .column('Desa:name').search(filterDesa, true, false)
+     .draw();
 }
 
 function switchTab(sheet) {
-    if (!allData[sheet] || allData[sheet].length === 0) return;
-
+    if (!allData[sheet]) return;
     $('.tab-btn').removeClass('bg-orange-600 text-white').addClass('bg-orange-100 text-orange-700');
     $(`button[onclick="switchTab('${sheet}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
 
@@ -60,9 +62,8 @@ function switchTab(sheet) {
         $('#mainTable').empty();
     }
 
-    // Perbaikan SLS: Mengambil header dari objek pertama yang valid
-    const firstRow = allData[sheet][0];
-    const columns = Object.keys(firstRow).map(k => ({ title: k, data: k }));
+    const keys = Object.keys(allData[sheet][0]);
+    const columns = keys.map(k => ({ title: k, data: k, name: k }));
 
     $('#mainTable').DataTable({
         data: allData[sheet],
@@ -71,6 +72,7 @@ function switchTab(sheet) {
         deferRender: true,
         destroy: true,
         initComplete: function() {
+            // Pembersihan data saat tabel dimuat
             applyFilters();
         }
     });
