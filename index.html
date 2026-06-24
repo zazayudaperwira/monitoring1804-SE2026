@@ -3,162 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoring Evaluasi Lapangan 1804</title>
-    
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <title>Dashboard Monitoring Real-time</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css">
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.dataTables.min.css">
+    <script type="text/javascript" charset="utf-8" src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.js"></script>
+    <script type="text/javascript" charset="utf-8" src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+    <script type="text/javascript" charset="utf-8" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+    <script type="text/javascript" charset="utf-8" src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        table.dataTable { border-collapse: collapse !important; width: 100% !important; font-size: 11px; }
-        table.dataTable thead th { background-color: #f1f5f9; color: #1e293b; font-weight: 700; border: 1px solid #cbd5e1 !important; text-align: center; padding: 6px 8px; }
-        table.dataTable td { border: 1px solid #e2e8f0 !important; padding: 6px 8px !important; }
-        .dataTables_wrapper .dataTables_paginate .paginate_button.current { background: #2563eb !important; color: white !important; border: none !important; border-radius: 0.375rem; }
-        
-        /* Gaya baris jika Progres Kurang dari Target Harian */
-        .row-target-failed { background-color: #fef2f2 !important; }
-        .row-target-failed td { color: #dc2626 !important; font-weight: 600; border-color: #fee2e2 !important; }
+        .row-target-failed {
+            background-color: #fee2e2 !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: #2563eb !important;
+            color: white !important;
+            border: 1px solid #2563eb !important;
+            border-radius: 0.375rem;
+        }
+        .dataTables_wrapper .dataTables_filter input {
+            border: 1px solid #cbd5e1;
+            border-radius: 0.375rem;
+            padding: 0.4rem 0.75rem;
+            margin-left: 0.5rem;
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased">
+<body class="bg-slate-50 font-sans text-slate-800">
 
-    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center py-3 gap-3">
-            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                <span class="text-sm font-bold text-blue-700 tracking-wider uppercase">📊 MONITORING EVALUASI 1804</span>
-                <div class="flex flex-wrap gap-1.5 items-center">
-                    <span id="txtLastUpdate" class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full font-semibold">Memuat waktu data...</span>
-                    <span id="txtSyncTimer" class="text-[10px] text-slate-500 bg-slate-100 px-2 py-1 rounded-full">Auto-Sync: 05:00</span>
-                </div>
-            </div>
-            
-            <div class="flex flex-wrap items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                <div class="flex items-center gap-1.5">
-                    <label class="text-[11px] font-bold text-slate-500 uppercase">Filter Wilayah:</label>
-                    <select id="filterWilayah" class="text-xs font-semibold bg-white border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">All Kecamatan</option>
-                    </select>
-                </div>
-                <div class="flex items-center gap-1.5">
-                    <label class="text-[11px] font-bold text-slate-500 uppercase">Filter Assignment:</label>
-                    <select id="filterAssignment" class="text-xs font-semibold bg-white border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Semua Status</option>
-                        <option value="OPEN">OPEN</option>
-                        <option value="DRAFT">DRAFT</option>
-                        <option value="SUBMITTED BY Pencacah">SUBMITTED BY Pencacah</option>
-                        <option value="REJECTED BY Pengawas">REJECTED BY Pengawas</option>
-                        <option value="APPROVED BY Pengawas">APPROVED BY Pengawas</option>
-                        <option value="REVOKED BY Pengawas">REVOKED BY Pengawas</option>
-                        <option value="SUBMITTED RESPONDENT">SUBMITTED RESPONDENT</option>
-                        <option value="EDITED BY Pengawas">EDITED BY Pengawas</option>
-                    </select>
-                </div>
-            </div>
+    <div id="loader" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
+        <h2 class="text-lg font-semibold text-slate-700 animate-pulse" id="loadingProgressText">Menghubungkan ke API server... (15%)</h2>
+        <div class="w-64 bg-slate-200 rounded-full h-2 mt-2 overflow-hidden">
+            <div id="loadingProgressFill" class="bg-blue-600 h-2 transition-all duration-300" style="width: 15%"></div>
         </div>
-    </nav>
+    </div>
 
-    <main class="max-w-7xl mx-auto p-4 space-y-6">
+    <div id="dashboardContent" class="hidden min-h-screen flex flex-col">
         
-        <div id="loader" class="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-slate-200 shadow-sm px-6">
-            <div class="w-full max-w-md bg-slate-100 rounded-full h-3 mb-3 p-0.5 overflow-hidden border border-slate-200">
-                <div id="loadingProgressFill" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 5%"></div>
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-blue-600 p-2 rounded-lg text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 002-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg text-slate-900 tracking-tight">MONITORING MITRA</h1>
+                        <p class="text-xs text-slate-500 font-medium" id="txtSyncTimer">Auto-Sync: 05:00</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium inline-block border border-slate-200">
+                        Kondisi Data: <span id="txtLastUpdate" class="font-semibold text-blue-600">Sync Real-time</span>
+                    </span>
+                </div>
             </div>
-            <p id="loadingProgressText" class="text-xs font-bold text-slate-600 animate-pulse">Menghubungkan ke Google Spreadsheet (5%)...</p>
-        </div>
+        </header>
 
-        <div id="dashboardContent" class="hidden space-y-6">
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
             
-            <div class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-5 rounded-xl shadow-md flex justify-between items-center">
-                <div>
-                    <h2 class="text-[10px] font-bold uppercase tracking-widest text-blue-200">Capaian Tingkat Kabupaten</h2>
-                    <h1 class="text-lg font-black tracking-tight">KABUPATEN LAMPUNG TIMUR</h1>
-                </div>
-                <div class="flex gap-4">
-                    <div class="text-center bg-white/10 px-3 py-1 rounded-lg border border-white/10">
-                        <span class="text-[9px] text-blue-200 uppercase font-bold">Total Approved</span>
-                        <h3 id="kabApproved" class="text-base font-bold">0</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-emerald-50 rounded-lg text-emerald-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                     </div>
-                    <div class="text-center bg-white/10 px-3 py-1 rounded-lg border border-white/10">
-                        <span class="text-[9px] text-blue-200 uppercase font-bold">Progres Akhir</span>
-                        <h3 id="kabProgres" class="text-base font-black text-emerald-300">0.00%</h3>
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Approved Kabupaten</p>
+                        <h3 class="text-2xl font-bold text-slate-900 mt-0.5" id="kabApproved">0</h3>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="p-3 bg-blue-50 rounded-lg text-blue-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.003 9.003 0 1020.945 13H11V3.055z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 uppercase tracking-wider">Persentase Progres Kabupaten</p>
+                        <h3 class="text-2xl font-bold text-slate-900 mt-0.5" id="kabProgres">0.00%</h3>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
-                <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Visualisasi Sebaran Data Berdasarkan Filter</h3>
-                <div class="h-64 w-full">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 items-center justify-between">
+                <div class="flex flex-wrap gap-3 items-center w-full sm:w-auto">
+                    <div class="flex flex-col min-w-[160px]">
+                        <label class="text-[11px] font-bold text-slate-400 uppercase mb-1">Filter Wilayah</label>
+                        <select id="filterWilayah" class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">All Kecamatan</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-col min-w-[160px]">
+                        <label class="text-[11px] font-bold text-slate-400 uppercase mb-1">Filter Status Grafik</label>
+                        <select id="filterAssignment" class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Semua Status</option>
+                            <option value="OPEN">OPEN</option>
+                            <option value="DRAFT">DRAFT</option>
+                            <option value="SUBMITTED BY Pencacah">SUBMITTED BY Pencacah</option>
+                            <option value="REJECTED BY Pengawas">REJECTED BY Pengawas</option>
+                            <option value="APPROVED BY Pengawas">APPROVED BY Pengawas</option>
+                            <option value="REVOKED BY Pengawas">REVOKED BY Pengawas</option>
+                            <option value="SUBMITTED RESPONDENT">SUBMITTED RESPONDENT</option>
+                            <option value="EDITED BY Pengawas">EDITED BY Pengawas</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="bg-slate-100 p-1 rounded-xl flex space-x-1 w-full sm:w-auto">
+                    <button id="btn-Kecamatan" onclick="switchTab('Kecamatan')" class="tab-btn flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 bg-blue-600 text-white shadow-sm">Kecamatan</button>
+                    <button id="btn-Desa" onclick="switchTab('Desa')" class="tab-btn flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 text-slate-600 hover:bg-slate-200">Desa</button>
+                    <button id="btn-PETUGAS" onclick="switchTab('PETUGAS')" class="tab-btn flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 text-slate-600 hover:bg-slate-200">Petugas</button>
+                    <button id="btn-SLS" onclick="switchTab('SLS')" class="tab-btn flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 text-slate-600 hover:bg-slate-200">SLS</button>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-slate-900 tracking-tight">Grafik Distribusi Status Target Dokumen (Top 15)</h3>
+                </div>
+                <div class="relative h-64 w-full">
                     <canvas id="progressChart"></canvas>
                 </div>
             </div>
 
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-5">
+                <table id="mainDataTable" class="w-full text-sm text-left text-slate-600 display nowrap" style="width:100%">
+                    </table>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-                    <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-                        <h3 class="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">🏆 10 PPL Progres Tertinggi</h3>
-                        <span class="text-[10px] text-slate-400 font-medium">Sesuai Filter Aktif</span>
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-emerald-50 border-b border-emerald-100 p-4 flex items-center space-x-2">
+                        <span class="text-emerald-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                        </span>
+                        <h4 class="font-bold text-emerald-900 text-sm tracking-tight">10 PPL Progres Tertinggi</h4>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs">
+                    <div class="p-2 overflow-x-auto">
+                        <table class="w-full text-xs text-left">
                             <thead>
-                                <tr class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                                    <th class="p-2 text-center w-12">No</th>
-                                    <th class="p-2">Nama PPL (Kecamatan)</th>
+                                <tr class="border-b border-slate-100 text-slate-400 font-bold">
+                                    <th class="p-2 text-center w-12">Rank</th>
+                                    <th class="p-2">Nama PPL</th>
                                     <th class="p-2 text-center w-24">Progres</th>
                                 </tr>
                             </thead>
-                            <tbody id="topPplList" class="divide-y divide-slate-100">
-                                <tr><td colspan="3" class="p-3 text-center text-slate-400">Loading ranking...</td></tr>
-                            </tbody>
+                            <tbody id="topPplList">
+                                </tbody>
                         </table>
                     </div>
                 </div>
 
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-                    <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-                        <h3 class="text-xs font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1">⚠️ 10 PPL Progres Terendah</h3>
-                        <span class="text-[10px] text-slate-400 font-medium">Sesuai Filter Aktif</span>
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-rose-50 border-b border-rose-100 p-4 flex items-center space-x-2">
+                        <span class="text-rose-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0v-8m0 8l-8-8-4 4-6-6" />
+                            </svg>
+                        </span>
+                        <h4 class="font-bold text-rose-900 text-sm tracking-tight">10 PPL Progres Terendah</h4>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs">
+                    <div class="p-2 overflow-x-auto">
+                        <table class="w-full text-xs text-left">
                             <thead>
-                                <tr class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                                    <th class="p-2 text-center w-12">No</th>
-                                    <th class="p-2">Nama PPL (Kecamatan)</th>
+                                <tr class="border-b border-slate-100 text-slate-400 font-bold">
+                                    <th class="p-2 text-center w-12">Rank</th>
+                                    <th class="p-2">Nama PPL</th>
                                     <th class="p-2 text-center w-24">Progres</th>
                                 </tr>
                             </thead>
-                            <tbody id="bottomPplList" class="divide-y divide-slate-100">
-                                <tr><td colspan="3" class="p-3 text-center text-slate-400">Loading ranking...</td></tr>
-                            </tbody>
+                            <tbody id="bottomPplList">
+                                </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div class="flex border-b border-slate-200 bg-slate-50 p-1.5 gap-1 overflow-x-auto">
-                    <button onclick="switchTab('Kecamatan')" id="btn-Kecamatan" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md bg-blue-600 text-white shadow-sm">Kecamatan</button>
-                    <button onclick="switchTab('Desa')" id="btn-Desa" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md text-slate-600 hover:bg-slate-200">Desa</button>
-                    <button onclick="switchTab('PETUGAS')" id="btn-PETUGAS" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md text-slate-600 hover:bg-slate-200">Petugas</button>
-                    <button onclick="switchTab('SLS')" id="btn-SLS" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md text-slate-600 hover:bg-slate-200">SLS</button>
-                </div>
-                <div class="p-4">
-                    <table id="mainDataTable" class="display cell-border compact stripe w-full text-slate-700"></table>
-                </div>
-            </div>
+        </main>
 
-        </div>
-    </main>
+        <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+            <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400 font-medium">
+                &copy; 2026 Badan Pusat Statistik. All Rights Reserved.
+            </div>
+        </footer>
+
+    </div>
 
     <script src="app.js"></script>
 </body>
