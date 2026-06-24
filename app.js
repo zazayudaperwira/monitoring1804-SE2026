@@ -1,4 +1,3 @@
-// URL Web App Google Apps Script Utama milik Anda
 const API_URL = "https://script.google.com/macros/s/AKfycbyj21A-KOVdCL5RMLjKwEnqg79VpHvUqLzNdIJBVMr5g-xJ7OHWtb9yfZEd3HzQDPphTg/exec";
 
 let globalData = {};
@@ -20,7 +19,6 @@ const statusColors = {
     "APPROVED BY Pengawas": "#10b981", "REVOKED BY Pengawas": "#64748b", "SUBMITTED RESPONDENT": "#8b5cf6", "EDITED BY Pengawas": "#06b6d4"
 };
 
-// Map struktur dasar kolom default tabel
 const baseColumnsConfig = {
     "Kecamatan": ["Kecamatan", "OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas", "APPROVED BY Pengawas", "REVOKED BY Pengawas", "SUBMITTED RESPONDENT", "EDITED BY Pengawas", "Only Open [SLS]"],
     "Desa": ["Kecamatan", "Desa", "OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas", "APPROVED BY Pengawas", "REVOKED BY Pengawas", "SUBMITTED RESPONDENT", "EDITED BY Pengawas", "Only Open [SLS]"],
@@ -74,8 +72,11 @@ async function loadDashboardWithProgress() {
             $('#loader').addClass('hidden');
             $('#dashboardContent').removeClass('hidden');
             document.getElementById('txtLastUpdate').innerText = spreadsheetInfoTime;
-            renderKabupatenSummary();
-            buildWilayahDropdown();
+            
+            // Menggunakan proteksi try-catch terisolasi agar kegagalan satu fungsi tidak mematikan fungsi drop-down wilayah
+            try { renderKabupatenSummary(); } catch(e) { console.error("Gagal memuat summary kabupaten:", e); }
+            try { buildWilayahDropdown(); } catch(e) { console.error("Gagal membuat dropdown wilayah:", e); }
+            
             switchTab(currentTab);
         }, 400);
     } catch (e) {
@@ -84,15 +85,12 @@ async function loadDashboardWithProgress() {
     }
 }
 
-// LOGIKA FIX PUSAT: Normalisasi key kecamatan & target harian agar kebal dari whitespace/kapitalisasi jenis apapun
 function normalizeRowKeys() {
     Object.keys(globalData).forEach(sheetName => {
         globalData[sheetName] = globalData[sheetName].map(row => {
             let newRow = {};
-            // Bersihkan white-space melenceng di nama kolom JSON
             Object.keys(row).forEach(k => { newRow[k.trim()] = row[k]; });
 
-            // Deteksi kolom Kecamatan secara fleksibel (mengantisipasi variasi huruf/spasi)
             let kecKey = Object.keys(newRow).find(k => k.toLowerCase() === "kecamatan");
             if (kecKey && newRow[kecKey]) {
                 newRow["Kecamatan"] = newRow[kecKey]; 
@@ -101,7 +99,6 @@ function normalizeRowKeys() {
                 newRow["_CleanKecamatan"] = "";
             }
 
-            // Deteksi kolom Progres secara otomatis
             let progKey = Object.keys(newRow).find(k => ["progres", "PROGRES", "Persentase Progres"].includes(k) || k.toLowerCase().includes("progres"));
             if (progKey) {
                 newRow["_MAPPED_PROGRES"] = newRow[progKey];
@@ -110,7 +107,6 @@ function normalizeRowKeys() {
                 newRow["_MAPPED_PROGRES"] = "0";
             }
 
-            // Deteksi kolom Target Harian dinamis (seperti: "Target Harian 23-06-2026 16.88%")
             let targetKey = Object.keys(newRow).find(k => k.toLowerCase().includes("target") || k.toLowerCase().includes("harian"));
             if (targetKey) {
                 newRow["_MAPPED_TARGET"] = newRow[targetKey];
@@ -126,8 +122,14 @@ function normalizeRowKeys() {
 
 function renderKabupatenSummary() {
     const kecData = globalData["Kecamatan"] || [];
-    // FIX TYPO: Mengubah "lampung timun" menjadi "lampung timur" agar pembacaan baris total kabupaten berjalan lancar
-    const kabRow = kecData.find(r => r["Kecamatan"] && r["Kecamatan"].toString().toLowerCase().includes("lampung timur"));
+    if (kecData.length === 0) return;
+    
+    // Mencari baris total secara fleksibel
+    const kabRow = kecData.find(r => r["Kecamatan"] && (
+        r["Kecamatan"].toString().toLowerCase().includes("lampung timur") || 
+        r["Kecamatan"].toString().toLowerCase().includes("total")
+    ));
+    
     if (kabRow) {
         document.getElementById('kabApproved').innerText = (parseInt(kabRow["APPROVED BY Pengawas"]) || 0).toLocaleString('id-ID');
         let num = parseToPureNumeric(kabRow["_MAPPED_PROGRES"]);
@@ -135,27 +137,31 @@ function renderKabupatenSummary() {
     }
 }
 
-// LOGIKA FIX DROPDOWN WILAYAH: Membangun daftar pilihan tanpa duplikasi & mengabaikan baris total kabupaten
+// FIX UTAMA: Pembangunan dropdown mengambil data secara defensif dari semua baris alternatif yang valid
 function buildWilayahDropdown() {
-    const kecData = globalData["Kecamatan"] || [];
     const select = $('#filterWilayah');
     const currVal = select.val();
-    
     select.find('option:not(:first)').remove();
+    
     let addedKec = new Set();
+    
+    // Ambil basis data referensi dari tab Kecamatan atau Desa yang tersedia
+    let sourceData = globalData["Kecamatan"] || globalData["Desa"] || globalData["PETUGAS"] || [];
 
-    kecData.forEach(row => {
+    sourceData.forEach(row => {
         let clean = row["_CleanKecamatan"];
         let raw = row["Kecamatan"];
         
-        if (raw && clean) {
+        if (raw && clean && clean !== "") {
             let rawStr = raw.toString().toLowerCase();
-            if (!rawStr.includes("lampung timur") && !addedKec.has(clean)) {
+            // Eliminasi kata kunci total kabupaten agar tidak ikut masuk list dropdown filter
+            if (!rawStr.includes("lampung timur") && !rawStr.includes("total") && !rawStr.includes("kabupaten") && !addedKec.has(clean)) {
                 select.append(`<option value="${clean}">${raw}</option>`);
                 addedKec.add(clean);
             }
         }
     });
+    
     if(currVal) select.val(currVal);
 }
 
@@ -184,8 +190,9 @@ function buildDataTableStructure() {
     }
 
     let processedData = rawSheetData.filter(r => {
-        let firstVal = Object.values(r)[0] || "";
-        return !firstVal.toString().toLowerCase().includes("lampung timur");
+        let firstVal = r["Kecamatan"] || Object.values(r)[0] || "";
+        let txt = firstVal.toString().toLowerCase();
+        return !txt.includes("lampung timur") && !txt.includes("total");
     });
 
     let sampleRow = processedData[0] || {};
@@ -305,8 +312,9 @@ function renderDinamisChart(cleanWilayah) {
     let statusSelected = $('#filterAssignment').val();
 
     let filtered = rawSheetData.filter(r => {
-        let firstVal = Object.values(r)[0] || "";
-        return !firstVal.toString().toLowerCase().includes("lampung timur");
+        let firstVal = r["Kecamatan"] || Object.values(r)[0] || "";
+        let txt = firstVal.toString().toLowerCase();
+        return !txt.includes("lampung timur") && !txt.includes("total");
     });
 
     if (cleanWilayah) {
