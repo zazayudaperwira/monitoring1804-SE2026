@@ -2,46 +2,94 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard Monitoring 1804</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring Evaluasi Lapangan 1804</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css">
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        table.dataTable { border-collapse: collapse !important; width: 100% !important; font-size: 11px; }
+        table.dataTable thead th { background-color: #f1f5f9; color: #1e293b; font-weight: 700; border: 1px solid #cbd5e1 !important; text-align: center; padding: 6px 8px; }
+        table.dataTable td { border: 1px solid #e2e8f0 !important; padding: 6px 8px !important; }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current { background: #2563eb !important; color: white !important; border: none !important; border-radius: 0.375rem; }
+    </style>
 </head>
-<body class="bg-slate-50 p-4 lg:p-8">
-    <div id="loader" class="text-center font-bold text-blue-600">Sedang memproses data...</div>
-    
-    <div id="dashboardContent" class="hidden space-y-6">
-        <div class="bg-gradient-to-r from-blue-800 to-indigo-900 text-white p-6 rounded-2xl shadow-xl flex justify-between items-center">
-            <div>
-                <h2 class="text-blue-200 text-xs font-bold uppercase tracking-widest">Capaian Kab. Lampung Timur</h2>
-                <h1 class="text-3xl font-black">MONITORING EVALUASI 1804</h1>
+<body class="bg-slate-50 text-slate-800 antialiased">
+
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center py-3 gap-3">
+            <div class="flex items-center gap-2">
+                <span class="text-sm font-bold text-blue-700 tracking-wider uppercase">📊 MONITORING EVALUASI 1804</span>
             </div>
-            <div id="kabProgres" class="text-4xl font-black text-emerald-300">0.00%</div>
+            
+            <div class="flex flex-wrap items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                <div class="flex items-center gap-1.5">
+                    <label class="text-[11px] font-bold text-slate-500 uppercase">Filter Wilayah:</label>
+                    <select id="filterWilayah" class="text-xs font-semibold bg-white border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">All Kecamatan</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto p-4 space-y-6">
+        <div id="loader" class="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-slate-200 space-y-2">
+            <div class="w-7 h-7 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-xs text-slate-500 font-medium">Mengunduh data real-time...</p>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div class="lg:col-span-3 bg-white p-6 rounded-2xl shadow-sm border h-80">
-                <canvas id="progressChart"></canvas>
+        <div id="dashboardContent" class="hidden space-y-6">
+            <div class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-4 rounded-xl shadow-md flex justify-between items-center">
+                <div>
+                    <h2 class="text-[10px] font-bold uppercase tracking-widest text-blue-200">Capaian Tingkat Kabupaten</h2>
+                    <h1 class="text-lg font-black tracking-tight">KABUPATEN LAMPUNG TIMUR</h1>
+                </div>
+                <div class="flex gap-4">
+                    <div class="text-center bg-white/10 px-3 py-1 rounded-lg border border-white/10">
+                        <span class="text-[9px] text-blue-200 uppercase font-bold">Total Approved</span>
+                        <h3 id="kabApproved" class="text-base font-bold">0</h3>
+                    </div>
+                    <div class="text-center bg-white/10 px-3 py-1 rounded-lg border border-white/10">
+                        <span class="text-[9px] text-blue-200 uppercase font-bold">Progres Akhir</span>
+                        <h3 id="kabProgres" class="text-base font-black text-emerald-300">0%</h3>
+                    </div>
+                </div>
             </div>
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                <select id="filterWilayah" class="w-full border p-2 rounded-lg text-sm"><option value="">Semua Kecamatan</option></select>
-                <select id="filterAssignment" class="w-full border p-2 rounded-lg text-sm"><option value="">Semua Status</option><option value="APPROVED BY Pengawas">APPROVED</option></select>
-                <button onclick="showRankings()" class="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-blue-700">Lihat Rank 10 Teratas/Terbawah</button>
-            </div>
-        </div>
 
-        <div class="bg-white p-6 rounded-2xl shadow-sm border">
-            <div class="flex gap-2 mb-4 overflow-x-auto">
-                <button onclick="renderTable('Kecamatan')" class="px-4 py-2 bg-slate-200 rounded-lg text-xs font-bold">Kecamatan</button>
-                <button onclick="renderTable('Desa')" class="px-4 py-2 bg-slate-200 rounded-lg text-xs font-bold">Desa</button>
-                <button onclick="renderTable('PETUGAS')" class="px-4 py-2 bg-slate-200 rounded-lg text-xs font-bold">Petugas</button>
-                <button onclick="renderTable('SLS')" class="px-4 py-2 bg-slate-200 rounded-lg text-xs font-bold">SLS</button>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Visualisasi Progres</h3>
+                <div class="h-60 w-full">
+                    <canvas id="progressChart"></canvas>
+                </div>
             </div>
-            <table id="mainDataTable" class="display w-full text-xs"></table>
+
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="flex border-b border-slate-200 bg-slate-50 p-1.5 gap-1 overflow-x-auto">
+                    <button onclick="switchTab('Kecamatan')" id="btn-Kecamatan" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md bg-blue-600 text-white shadow-sm">Kecamatan</button>
+                    <button onclick="switchTab('Desa')" id="btn-Desa" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md text-slate-600 hover:bg-slate-200">Desa</button>
+                    <button onclick="switchTab('PETUGAS')" id="btn-PETUGAS" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md text-slate-600 hover:bg-slate-200">Petugas</button>
+                    <button onclick="switchTab('SLS')" id="btn-SLS" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md text-slate-600 hover:bg-slate-200">SLS</button>
+                </div>
+
+                <div class="p-4">
+                    <table id="mainDataTable" class="display cell-border compact stripe w-full text-slate-700"></table>
+                </div>
+            </div>
         </div>
-    </div>
+    </main>
+
     <script src="app.js"></script>
 </body>
 </html>
