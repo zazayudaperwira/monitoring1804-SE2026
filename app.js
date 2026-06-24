@@ -1,4 +1,4 @@
-// MASUKKAN URL WEB APP EXEC BARU ANDA DI SINI
+// URL Web App Google Apps Script Utama milik Anda
 const API_URL = "https://script.google.com/macros/s/AKfycbyj21A-KOVdCL5RMLjKwEnqg79VpHvUqLzNdIJBVMr5g-xJ7OHWtb9yfZEd3HzQDPphTg/exec";
 
 let globalData = {};
@@ -84,16 +84,25 @@ async function loadDashboardWithProgress() {
     }
 }
 
-// LOGIKA FIX: Normalisasi Key agar dibaca seragam oleh sistem internal javascript
+// LOGIKA FIX PUSAT: Normalisasi key kecamatan & target harian agar kebal dari whitespace/kapitalisasi jenis apapun
 function normalizeRowKeys() {
     Object.keys(globalData).forEach(sheetName => {
         globalData[sheetName] = globalData[sheetName].map(row => {
             let newRow = {};
-            // Salin key asli sembari trim spasi kosong
+            // Bersihkan white-space melenceng di nama kolom JSON
             Object.keys(row).forEach(k => { newRow[k.trim()] = row[k]; });
 
-            // Deteksi kolom Progres secara modular
-            let progKey = Object.keys(newRow).find(k => ["progres", "progres", "PROGRES", "Persentase Progres"].includes(k) || k.toLowerCase().includes("progres"));
+            // Deteksi kolom Kecamatan secara fleksibel (mengantisipasi variasi huruf/spasi)
+            let kecKey = Object.keys(newRow).find(k => k.toLowerCase() === "kecamatan");
+            if (kecKey && newRow[kecKey]) {
+                newRow["Kecamatan"] = newRow[kecKey]; 
+                newRow["_CleanKecamatan"] = newRow[kecKey].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
+            } else {
+                newRow["_CleanKecamatan"] = "";
+            }
+
+            // Deteksi kolom Progres secara otomatis
+            let progKey = Object.keys(newRow).find(k => ["progres", "PROGRES", "Persentase Progres"].includes(k) || k.toLowerCase().includes("progres"));
             if (progKey) {
                 newRow["_MAPPED_PROGRES"] = newRow[progKey];
                 newRow["PROGRES"] = newRow[progKey];
@@ -101,7 +110,7 @@ function normalizeRowKeys() {
                 newRow["_MAPPED_PROGRES"] = "0";
             }
 
-            // Deteksi kolom Target Harian dinamis (misal: "Target Harian 23-06-2026 16.88%")
+            // Deteksi kolom Target Harian dinamis (seperti: "Target Harian 23-06-2026 16.88%")
             let targetKey = Object.keys(newRow).find(k => k.toLowerCase().includes("target") || k.toLowerCase().includes("harian"));
             if (targetKey) {
                 newRow["_MAPPED_TARGET"] = newRow[targetKey];
@@ -110,9 +119,6 @@ function normalizeRowKeys() {
                 newRow["_MAPPED_TARGET"] = "0";
             }
 
-            if (newRow["Kecamatan"]) {
-                newRow["_CleanKecamatan"] = newRow["Kecamatan"].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
-            }
             return newRow;
         });
     });
@@ -120,7 +126,7 @@ function normalizeRowKeys() {
 
 function renderKabupatenSummary() {
     const kecData = globalData["Kecamatan"] || [];
-    const kabRow = kecData.find(r => r["Kecamatan"] && r["Kecamatan"].toString().toLowerCase().includes("lampung timur"));
+    const kabRow = kecData.find(r => r["Kecamatan"] && r["Kecamatan"].toString().toLowerCase().includes("lampung timun"));
     if (kabRow) {
         document.getElementById('kabApproved').innerText = (parseInt(kabRow["APPROVED BY Pengawas"]) || 0).toLocaleString('id-ID');
         let num = parseToPureNumeric(kabRow["_MAPPED_PROGRES"]);
@@ -128,17 +134,25 @@ function renderKabupatenSummary() {
     }
 }
 
+// LOGIKA FIX DROPDOWN WILAYAH: Membangun daftar pilihan tanpa duplikasi & mengabaikan baris total kabupaten
 function buildWilayahDropdown() {
     const kecData = globalData["Kecamatan"] || [];
     const select = $('#filterWilayah');
     const currVal = select.val();
-    select.find('option:not(:first)').remove();
     
+    select.find('option:not(:first)').remove();
+    let addedKec = new Set();
+
     kecData.forEach(row => {
         let clean = row["_CleanKecamatan"];
         let raw = row["Kecamatan"];
-        if (raw && !raw.toLowerCase().includes("lampung timur")) {
-            select.append(`<option value="${clean}">${raw}</option>`);
+        
+        if (raw && clean) {
+            let rawStr = raw.toString().toLowerCase();
+            if (!rawStr.includes("lampung timur") && !addedKec.has(clean)) {
+                select.append(`<option value="${clean}">${raw}</option>`);
+                addedKec.add(clean);
+            }
         }
     });
     if(currVal) select.val(currVal);
@@ -156,11 +170,10 @@ function parseToPureNumeric(val) {
     let clean = val.toString().replace(/[^0-9.]/g, '');
     let num = parseFloat(clean);
     if (isNaN(num)) return 0;
-    if (num <= 1 && num > 0) num = num * 100; // Mengubah desimal pecahan spreadsheet ke bentuk puluhan (%)
+    if (num <= 1 && num > 0) num = num * 100; 
     return num;
 }
 
-// MEMBANGUN STRUKTUR TABEL DINAMIS TANPA DEFINE STIK KOLOM DI AWAL
 function buildDataTableStructure() {
     let rawSheetData = globalData[currentTab] || [];
     
@@ -174,16 +187,13 @@ function buildDataTableStructure() {
         return !firstVal.toString().toLowerCase().includes("lampung timur");
     });
 
-    // Cari tahu nama asli key kolom Progres & Target di JSON saat ini
     let sampleRow = processedData[0] || {};
     let realProgKey = Object.keys(sampleRow).find(k => k.toLowerCase().includes("progres") && !k.startsWith("_")) || "PROGRES";
     let realTargetKey = Object.keys(sampleRow).find(k => (k.toLowerCase().includes("target") || k.toLowerCase().includes("harian")) && !k.startsWith("_")) || "Target Harian";
     let realRankKey = Object.keys(sampleRow).find(k => k.toLowerCase() === "rank") || "Rank";
 
-    // Susun susunan kolom final untuk tabel
     let dynamicColumns = [...(baseColumnsConfig[currentTab] || [])];
     
-    // Append kolom progres & target di sisi kanan jika tabnya mendukung
     if (currentTab !== "SLS") {
         if (!dynamicColumns.includes(realProgKey)) dynamicColumns.push(realProgKey);
         if (!dynamicColumns.includes(realTargetKey)) dynamicColumns.push(realTargetKey);
@@ -198,7 +208,6 @@ function buildDataTableStructure() {
             render: function(data, type, row) {
                 if (data === undefined || data === null || data === "") return "-";
                 
-                // Formatter khusus kolom Progres & Target Harian
                 if (colName === realProgKey || colName === realTargetKey) {
                     let num = parseToPureNumeric(data);
                     return num.toFixed(2) + "%";
@@ -221,12 +230,9 @@ function buildDataTableStructure() {
         ],
         pageLength: 10,
         scrollX: true,
-        
-        // WARNAI BARIS MERAH JIKA CAPAIAN KURANG DARI TARGET HARIAN BERJALAN
         createdRow: function(row, data, dataIndex) {
             let numProgres = parseToPureNumeric(data["_MAPPED_PROGRES"]);
             let numTarget = parseToPureNumeric(data["_MAPPED_TARGET"]);
-
             if (numTarget > 0 && numProgres < numTarget) {
                 $(row).addClass('row-target-failed');
             }
