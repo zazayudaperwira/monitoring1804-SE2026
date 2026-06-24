@@ -1,49 +1,67 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Monitoring SE2026</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-</head>
-<body class="bg-orange-50 p-6">
+const API="https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
+let allData={};
 
-<div class="max-w-7xl mx-auto space-y-6">
+function p(x){
+return Number(x.PROGRES??x.Progres??x["Persentase Progres"]??0);
+}
+function pct(x){return (p(x)*100).toFixed(1)+"%";}
 
-<div class="bg-orange-800 text-white rounded-3xl p-8">
-<h1 class="text-4xl font-black">MONITORING SE2026</h1>
-<p id="updateInfo"></p>
-</div>
+$(async()=>{
+let j=await (await fetch(API)).json();
+allData=j.data;
 
-<div class="grid md:grid-cols-4 gap-4">
-<div class="bg-white rounded-2xl p-5 shadow">Total SLS<h2 id="totalSLS"></h2></div>
-<div class="bg-white rounded-2xl p-5 shadow">Selesai<h2 id="totalDone"></h2></div>
-<div class="bg-white rounded-2xl p-5 shadow">Progress<h2 id="progressCard"></h2></div>
-<div class="bg-white rounded-2xl p-5 shadow">LIVE</div>
-</div>
+$("#updateInfo").text("Update : "+j.metadata.update);
+$("#totalSLS").text(allData.SLS.length);
+$("#totalDone").text(allData.SLS.reduce((a,b)=>a+Number(b["APPROVED BY Pengawas"]||0),0));
+$("#progressCard").text(pct(allData.Kecamatan[0]));
 
-<div class="grid md:grid-cols-2 gap-6">
+rank();
+switchTab("Kecamatan");
+});
 
-<div class="bg-white p-5 rounded-3xl shadow"><h2>Top Kecamatan</h2><div id="topKec"></div></div>
-<div class="bg-white p-5 rounded-3xl shadow"><h2>Top Desa</h2><div id="topDesa"></div></div>
-<div class="bg-white p-5 rounded-3xl shadow"><h2>Top PPL</h2><div id="topPetugas"></div></div>
-<div class="bg-white p-5 rounded-3xl shadow"><h2>Bottom PPL</h2><div id="bottomPetugas"></div></div>
+function rank(){
 
-</div>
+let kec=[...allData.Kecamatan].sort((a,b)=>p(b)-p(a));
+let desa=[...allData.Desa].sort((a,b)=>p(b)-p(a));
+let ppl=[...allData.PETUGAS].sort((a,b)=>p(b)-p(a));
 
-<div class="bg-white rounded-3xl p-5 shadow">
-<button onclick="switchTab('Kecamatan')">Kecamatan</button>
-<button onclick="switchTab('Desa')">Desa</button>
-<button onclick="switchTab('PETUGAS')">PPL</button>
-<button onclick="switchTab('SLS')">SLS</button>
+draw(kec,"topKec");
+draw(desa,"topDesa");
+drawPpl(ppl,"topPetugas");
+drawPpl([...ppl].reverse(),"bottomPetugas");
 
-<table id="mainTable"></table>
-</div>
+}
 
-</div>
+function draw(a,id){
+$("#"+id).html(a.slice(0,10).map((x,i)=>`
+<div class="border-b py-2">
+<b>${i+1}</b> ${x.Kecamatan||x.Desa}<br>
+PROGRES : ${pct(x)}
+</div>`).join(""));
+}
 
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="app.js"></script>
-</body>
-</html>
+function drawPpl(a,id){
+$("#"+id).html(a.slice(0,10).map((x,i)=>`
+<div class="border-b py-2">
+<b>${i+1}</b> ${x.PPL}<br>
+${x.Kecamatan||""}<br>
+Persentase Progres : ${pct(x)}
+</div>`).join(""));
+}
+
+function switchTab(sheet){
+
+if($.fn.DataTable.isDataTable("#mainTable"))
+$("#mainTable").DataTable().destroy();
+
+let d=allData[sheet];
+
+$("#mainTable").DataTable({
+data:d,
+columns:Object.keys(d[0]).map(k=>({title:k,data:k})),
+searching:true,
+ordering:true,
+scrollX:true
+});
+
+}
