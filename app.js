@@ -13,6 +13,11 @@ $(document).ready(function() {
         setTimeout(() => $('#progressContainer').hide(), 300);
         allData = res.data;
         $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
+        
+        // Progres Kab Lampung Timur
+        const kabData = allData.Kecamatan.find(d => d.Kecamatan === "Lampung Timur");
+        if(kabData) $('#kabProgres').text((Number(kabData.Progres) * 100).toFixed(1) + "%");
+        
         [...new Set(allData.Kecamatan.map(d => d.Kecamatan))].forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
         switchTab('Kecamatan');
         updateChart();
@@ -58,13 +63,15 @@ function switchTab(sheet) {
     
     $('#mainTable').DataTable({ 
         data: allData[sheet], 
-        columns: Object.keys(allData[sheet][0]).map(k => ({ title: k, data: k })), 
-        scrollX: true, 
-        destroy: true,
+        columns: Object.keys(allData[sheet][0]).map(k => ({ 
+            title: k, data: k,
+            render: (data) => (k.toLowerCase().includes('progres') && typeof data === 'number') ? (data * 100).toFixed(1) + '%' : data
+        })),
+        scrollX: true, destroy: true,
         rowCallback: function(row, data) {
             if (data['Target Harian'] === 'Tidak') {
                 $(row).find('td').filter(function() { return $(this).text() === 'Tidak'; })
-                    .css({ 'background-color': '#fee2e2', 'color': '#b91c1c', 'font-weight': 'bold' });
+                    .css({ 'color': 'red', 'font-weight': 'bold' });
             }
         },
         initComplete: () => applyFilters() 
@@ -82,7 +89,6 @@ $('#fKec').change(function() {
     allData.Desa.filter(d => d.Kecamatan === $(this).val()).forEach(d => $('#fDesa').append(`<option value="${d.Desa}">${d.Desa}</option>`));
     updateChart(); applyFilters();
 });
-
 $('#fDesa').change(() => { applyFilters(); updateChart(); });
 
 function resetFilters() {
