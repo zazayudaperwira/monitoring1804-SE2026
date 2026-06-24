@@ -3,27 +3,36 @@ let allData = {};
 let filterState = { kec: "", desa: "", stat: "" };
 
 $(document).ready(function() {
-    fetch(API).then(res => res.json()).then(res => {
-        allData = res.data;
-        $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
-        
-        // Inisialisasi Dropdown Kecamatan
-        const kecs = [...new Set(allData.Kecamatan.map(d => d.Kecamatan))];
-        kecs.forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
-        
-        switchTab('Kecamatan');
-    });
-
-    $('#fKec').change(function() {
-        filterState.kec = $(this).val();
-        filterState.desa = "";
-        updateDesaDropdown();
-        applyFilters();
-    });
-
-    $('#fDesa').change(function() { filterState.desa = $(this).val(); applyFilters(); });
-    $('#fStat').change(function() { filterState.stat = $(this).val(); applyFilters(); });
+    const cached = localStorage.getItem('dashboardData');
+    if (cached) {
+        processData(JSON.parse(cached));
+        $('#loader').hide();
+    } else {
+        loadFromAPI();
+    }
 });
+
+function loadFromAPI() {
+    let p = 0;
+    const i = setInterval(() => { p += 10; $('#progress-bar').css('width', p + '%'); $('#perc').text(p); if (p >= 90) clearInterval(i); }, 150);
+    fetch(API).then(res => res.json()).then(res => {
+        localStorage.setItem('dashboardData', JSON.stringify(res));
+        processData(res);
+        $('#progress-bar').css('width', '100%'); $('#perc').text(100); $('#loader').fadeOut(500);
+    });
+}
+
+function processData(res) {
+    allData = res.data;
+    $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
+    const kecs = [...new Set(allData.Kecamatan.map(d => d.Kecamatan))];
+    kecs.forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
+    switchTab('Kecamatan');
+}
+
+$('#fKec').change(function() { filterState.kec = $(this).val(); filterState.desa = ""; updateDesaDropdown(); applyFilters(); });
+$('#fDesa').change(function() { filterState.desa = $(this).val(); applyFilters(); });
+$('#fStat').change(function() { filterState.stat = $(this).val(); applyFilters(); });
 
 function updateDesaDropdown() {
     $('#fDesa').html('<option value="">Semua Desa</option>');
@@ -34,8 +43,8 @@ function updateDesaDropdown() {
 }
 
 function applyFilters() {
-    const table = $('#mainTable').DataTable();
-    table.column(0).search(filterState.kec).column(1).search(filterState.desa).column(2).search(filterState.stat).draw();
+    const t = $('#mainTable').DataTable();
+    t.column(0).search(filterState.kec).column(1).search(filterState.desa).column(2).search(filterState.stat).draw();
 }
 
 function switchTab(sheet) {
@@ -48,6 +57,7 @@ function switchTab(sheet) {
         data: allData[sheet],
         columns: Object.keys(allData[sheet][0] || {}).map(k => ({ title: k, data: k })),
         scrollX: true,
+        deferRender: true, // Mempercepat render 6000+ baris
         initComplete: () => applyFilters()
     });
 }
