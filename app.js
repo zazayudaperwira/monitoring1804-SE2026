@@ -1,121 +1,67 @@
-const API =
-"https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
-
+const API="https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
 
 let allData={};
 let chart=null;
 
 
-
 function getProgress(row){
 
-    return Number(
-        row.PROGRES ??
-        row.Progres ??
-        row["Persentase Progres"] ??
-        0
-    );
+    if(row.PROGRES!==undefined)
+        return Number(row.PROGRES);
 
+    if(row.Progres!==undefined)
+        return Number(row.Progres);
+
+    if(row["Persentase Progres"]!==undefined)
+        return Number(row["Persentase Progres"]);
+
+    return 0;
 }
-
 
 
 function persen(row){
 
-    return (getProgress(row)*100)
-    .toFixed(1)+"%";
+    return (getProgress(row)*100).toFixed(1)+"%";
 
 }
-
-
-
 
 
 
 
 $(async function(){
 
+    let res=await fetch(API);
+    let json=await res.json();
 
-const res =
-await fetch(API);
-
-
-const json =
-await res.json();
+    allData=json.data;
 
 
-allData=json.data;
+    $("#updateInfo")
+    .text("Update Terakhir : "+json.metadata.update);
 
 
+    let kab=allData.Kecamatan[0];
 
-$("#updateInfo")
-.text(
-"Update Terakhir : "+json.metadata.update
-);
+    if(kab){
 
+        $("#kabProgres")
+        .text(persen(kab));
 
-
-$("#totalSLS")
-.text(
-allData.SLS.length
-);
+    }
 
 
-
-let selesai =
-allData.SLS.reduce(
-(a,b)=>
-a+
-Number(
-b["APPROVED BY Pengawas"]||0
-),
-0
-);
+    loadFilter();
 
 
-$("#totalDone")
-.text(selesai);
+    updateRanking();
 
 
+    switchTab("Kecamatan");
 
 
-if(allData.Kecamatan.length){
-
-$("#kabProgres")
-.text(
-persen(allData.Kecamatan[0])
-);
-
-
-$("#progressCard")
-.text(
-persen(allData.Kecamatan[0])
-);
-
-}
-
-
-
-
-loadFilter();
-
-
-
-updateRanking();
-
-
-
-switchTab("Kecamatan");
-
-
-
-updateChart();
-
-
+    updateChart();
 
 });
-
-
 
 
 
@@ -126,36 +72,24 @@ updateChart();
 function loadFilter(){
 
 
-let kec =
-[
-...new Set(
-allData.Kecamatan
-.map(x=>x.Kecamatan)
-)
-];
+    let kec=[...new Set(
+        allData.Kecamatan.map(x=>x.Kecamatan)
+    )];
 
 
+    kec.forEach(x=>{
 
-kec.forEach(x=>{
+        $("#fKec")
+        .append(
+        `<option value="${x}">
+        ${x}
+        </option>`
+        );
 
-
-$("#fKec")
-.append(
-`
-<option value="${x}">
-${x}
-</option>
-`
-);
-
-
-});
+    });
 
 
 }
-
-
-
 
 
 
@@ -165,90 +99,25 @@ ${x}
 function updateRanking(){
 
 
-
-let kec =
-[...allData.Kecamatan]
+let ppl=[
+...allData.PETUGAS
+]
 .sort(
-(a,b)=>
-getProgress(b)-getProgress(a)
+(a,b)=>getProgress(b)-getProgress(a)
 );
 
 
 
-let desa =
-[...allData.Desa]
-.sort(
-(a,b)=>
-getProgress(b)-getProgress(a)
+renderPPL(
+ppl,
+"topPetugas"
 );
 
 
 
-let petugas =
-[...allData.PETUGAS]
-.sort(
-(a,b)=>
-getProgress(b)-getProgress(a)
-);
-
-
-
-
-
-renderWilayah(
-kec,
-"topKecamatan",
-5,
-"Kecamatan"
-);
-
-
-
-renderWilayah(
-[...kec].reverse(),
-"bottomKecamatan",
-5,
-"Kecamatan"
-);
-
-
-
-
-
-renderWilayah(
-desa,
-"topDesa",
-5,
-"Desa"
-);
-
-
-
-
-renderWilayah(
-[...desa].reverse(),
-"bottomDesa",
-5,
-"Desa"
-);
-
-
-
-
-
-
-renderPetugas(
-petugas,
-"topPetugas",
-10
-);
-
-
-
-renderPetugas(
-[...petugas].reverse(),
-"bottomPetugas",
-10
+renderPPL(
+[...ppl].reverse(),
+"bottomPetugas"
 );
 
 
@@ -259,112 +128,31 @@ renderPetugas(
 
 
 
+function renderPPL(data,id){
 
 
+$("#"+id).html(
 
-
-function renderWilayah(
-data,
-id,
-jumlah,
-kolom
-){
-
-
-
-$("#"+id)
-.html(
-
-
-data.slice(0,jumlah)
+data.slice(0,10)
 .map((x,i)=>{
 
 
 return `
 
-<div class="border-b py-3">
+<div class="border-b py-2">
 
-
-<b>
-${i+1}. ${x[kolom]}
-</b>
-
+<b>${i+1}. ${x.PPL}</b>
 
 <br>
-
-
-<span class="text-gray-500">
-
-PROGRES :
-${persen(x)}
-
-</span>
-
-
-</div>
-
-`;
-
-})
-.join("")
-
-
-);
-
-
-
-}
-
-
-
-
-
-
-
-
-
-function renderPetugas(
-data,
-id,
-jumlah
-){
-
-
-
-$("#"+id)
-.html(
-
-
-data.slice(0,jumlah)
-.map((x,i)=>{
-
-
-return `
-
-
-<div class="border-b py-3">
-
-
-<b>
-${i+1}. ${x.PPL}
-</b>
-
-
-<br>
-
 
 <span>
-
 Kecamatan :
 ${x.Kecamatan || "-"}
-
 </span>
-
 
 <br>
 
-
-<span class="text-gray-500">
+<span class="text-green-600">
 
 Persentase Progres :
 ${persen(x)}
@@ -372,11 +160,10 @@ ${persen(x)}
 </span>
 
 
-
 </div>
 
 
-`;
+`
 
 
 })
@@ -386,8 +173,8 @@ ${persen(x)}
 );
 
 
-
 }
+
 
 
 
@@ -400,6 +187,9 @@ ${persen(x)}
 function switchTab(sheet){
 
 
+if(!allData[sheet]) return;
+
+
 
 if(
 $.fn.DataTable.isDataTable("#mainTable")
@@ -407,42 +197,32 @@ $.fn.DataTable.isDataTable("#mainTable")
 
 $("#mainTable")
 .DataTable()
+.clear()
 .destroy();
-
 
 $("#mainTable")
 .empty();
-
 
 }
 
 
 
-let data =
-allData[sheet];
 
-
-
-if(!data || !data.length)
-return;
-
+let data=allData[sheet];
 
 
 
 $("#mainTable")
 .DataTable({
 
+
 data:data,
 
 
 columns:
 
-
 Object.keys(data[0])
-.map(col=>{
-
-
-return {
+.map(col=>({
 
 
 title:col,
@@ -454,7 +234,6 @@ data:col,
 render:function(value){
 
 
-
 if(
 col==="PROGRES" ||
 col==="Progres" ||
@@ -463,11 +242,10 @@ col==="Persentase Progres"
 
 return (
 Number(value)*100
-)
-.toFixed(1)+"%";
+).toFixed(1)+"%";
+
 
 }
-
 
 
 return value;
@@ -476,11 +254,7 @@ return value;
 }
 
 
-};
-
-
-}),
-
+})),
 
 
 pageLength:10,
@@ -495,12 +269,12 @@ ordering:true,
 scrollX:true
 
 
+
 });
 
 
 
 }
-
 
 
 
@@ -512,13 +286,10 @@ scrollX:true
 function updateChart(){
 
 
-let data =
-allData.SLS;
+let data=allData.SLS;
 
 
-
-let labels =
-[
+let labels=[
 ...new Set(
 data.map(x=>x.Kecamatan)
 )
@@ -526,12 +297,11 @@ data.map(x=>x.Kecamatan)
 
 
 
-let nilai =
-labels.map(k=>{
+let values=labels.map(k=>
 
 
-return data
-.filter(x=>x.Kecamatan===k)
+data.filter(x=>x.Kecamatan===k)
+
 .reduce(
 (a,b)=>
 a+
@@ -539,10 +309,9 @@ Number(
 b["APPROVED BY Pengawas"]||0
 ),
 0
+)
+
 );
-
-
-});
 
 
 
@@ -551,47 +320,25 @@ chart.destroy();
 
 
 
-
-chart =
-new Chart(
+chart=new Chart(
 document.getElementById("progresChart"),
 {
 
-
 type:"bar",
-
 
 data:{
 
-
 labels:labels,
-
 
 datasets:[{
 
 label:"APPROVED BY Pengawas",
 
-data:nilai
-
+data:values
 
 }]
 
-
-},
-
-
-options:{
-
-
-responsive:true,
-
-
-maintainAspectRatio:false
-
-
 }
-
-
 
 }
 
@@ -605,25 +352,12 @@ maintainAspectRatio:false
 
 
 
-
-
-
-
 function resetFilters(){
 
+$("#fKec").val("");
 
-$("#fKec")
-.val("");
-
-
-
-$("#fDesa")
-.val("");
-
-
+$("#fDesa").val("");
 
 updateChart();
-
-
 
 }
