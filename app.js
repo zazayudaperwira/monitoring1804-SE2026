@@ -5,6 +5,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbyj21A-KOVdCL5RMLjKwEnq
 let globalData = {};
 let currentTab = "Kecamatan";
 let chartInstance = null;
+let spreadsheetInfoTime = "Sync Real-time";
 
 const targetStatus = [
     "OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas", 
@@ -50,7 +51,6 @@ $(document).ready(function() {
     });
 });
 
-// SIMULASI PROGRESS BAR REAL-TIME
 function updateProgressBar(percent, text) {
     $('#loadingProgressFill').css('width', percent + '%');
     $('#loadingProgressText').text(`${text} (${percent}%)`);
@@ -61,20 +61,22 @@ async function loadDashboardWithProgress() {
         updateProgressBar(15, "Menghubungkan ke API server...");
         const response = await fetch(API_URL, { method: 'GET', redirect: 'follow' });
         
-        updateProgressBar(45, "Data terunduh, menyusun struktur data...");
+        updateProgressBar(45, "Mendownload data dari Google Spreadsheet...");
         globalData = await response.json();
         
-        updateProgressBar(75, "Melakukan kalkulasi persentase wilayah...");
+        updateProgressBar(75, "Mengekstrak informasi tanggal waktu Cell A1...");
         
-        // Membersihkan string pembersih spasi dan emoji di level Kecamatan
-        if (globalData["Kecamatan"]) {
-            globalData["Kecamatan"] = globalData["Kecamatan"].map(r => {
-                if (r["Kecamatan"]) {
-                    r["_CleanKecamatan"] = r["Kecamatan"].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
-                }
-                return r;
-            });
+        // EKSTRAKSI INFORMASI WAKTU DARI CELL A1 (Mencari kunci bernilai KONDISI)
+        if (globalData["Kecamatan"] && globalData["Kecamatan"].length > 0) {
+            let sampleRow = globalData["Kecamatan"][0];
+            let foundTimeKey = Object.keys(sampleRow).find(k => k.toString().includes("KONDISI"));
+            if (foundTimeKey) {
+                spreadsheetInfoTime = foundTimeKey.trim();
+            }
         }
+
+        // Normalisasi key-value data agar tidak kosong saat di-hardcode
+        cleanAndNormalizeKeys();
 
         updateProgressBar(100, "Selesai! Membuka dashboard...");
         
@@ -82,8 +84,8 @@ async function loadDashboardWithProgress() {
             document.getElementById('loader').classList.add('hidden');
             document.getElementById('dashboardContent').classList.remove('hidden');
             
-            const time = new Date();
-            document.getElementById('txtLastUpdate').innerText = `Sync: ${time.toLocaleTimeString('id-ID')} WIB`;
+            // Masukkan Teks Cell A1 ke Navbar
+            document.getElementById('txtLastUpdate').innerText = spreadsheetInfoTime;
             
             renderKabupatenSummary();
             buildWilayahDropdown();
@@ -92,8 +94,47 @@ async function loadDashboardWithProgress() {
 
     } catch (e) {
         console.error(e);
-        $('#loadingProgressText').html(`<span class="text-red-500">Gagal memuat data. Cek Deployment Apps Script Anda.</span>`);
+        $('#loadingProgressText').html(`<span class="text-red-500">Gagal memuat data. Periksa Apps Script Anda.</span>`);
     }
+}
+
+// FUNGSI UTAMA PENYELAMAT DATA KOSONG (Fuzzy Map Normalizer)
+function cleanAndNormalizeKeys() {
+    Object.keys(globalData).forEach(sheetName => {
+        globalData[sheetName] = globalData[sheetName].map(row => {
+            let newRow = {};
+            
+            // Salin data asli sambil bersihkan spasi nama properti
+            Object.keys(row).forEach(k => {
+                newRow[k.trim()] = row[k];
+            });
+
+            // Pemetaan Pintar khusus untuk Kolom Persentase Akhir Progres
+            let progValue = row["PROGRES"] || row["Progres"] || row["progres"] || row["16.88%"] || row["Persentase Progres"];
+            if (progValue !== undefined) {
+                newRow["PROGRES"] = progValue;
+                newRow["Progres"] = progValue;
+                newRow["Persentase Progres"] = progValue;
+                newRow["16.88%"] = progValue;
+            }
+
+            // Pemetaan Pintar khusus untuk Kolom Batas Tanggal Target & Target Harian
+            let targetDayValue = row["Target Harian"] || row["target harian"];
+            if (targetDayValue !== undefined) {
+                newRow["Target Harian"] = targetDayValue;
+            }
+
+            let dateTargetValue = row["23-06-2026"] || row["23-06-2026"];
+            if (dateTargetValue !== undefined) {
+                newRow["23-06-2026"] = dateTargetValue;
+            }
+
+            if (newRow["Kecamatan"]) {
+                newRow["_CleanKecamatan"] = newRow["Kecamatan"].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
+            }
+            return newRow;
+        });
+    });
 }
 
 function renderKabupatenSummary() {
@@ -103,8 +144,7 @@ function renderKabupatenSummary() {
     if (kabRow) {
         document.getElementById('kabApproved').innerText = (parseInt(kabRow["APPROVED BY Pengawas"]) || 0).toLocaleString('id-ID');
         
-        // FORMAT PERSENTASE 0.1133 -> 11.34% SECARA PRESISI
-        let rawProg = kabRow["PROGRES"] || kabRow["Progres"] || 0;
+        let rawProg = kabRow["PROGRES"] || 0;
         if (typeof rawProg === "string") rawProg = parseFloat(rawProg.replace(/[^0-9.]/g, ''));
         if (rawProg < 1 && rawProg > 0) rawProg = rawProg * 100;
         
@@ -121,7 +161,6 @@ function buildWilayahDropdown() {
         let clean = row["_CleanKecamatan"];
         let raw = row["Kecamatan"];
         if (raw && !raw.toLowerCase().includes("lampung timur")) {
-            // value diisi kode bersih, text diisi text asli spreadsheet
             select.append(`<option value="${clean}">${raw}</option>`);
         }
     });
@@ -144,7 +183,6 @@ function buildDataTableStructure() {
         $('#mainDataTable').empty();
     }
 
-    // Bersihkan row total Lampung Timur
     let processedData = rawSheetData.filter(r => {
         let firstVal = Object.values(r)[0] || "";
         return !firstVal.toString().toLowerCase().includes("lampung timur");
@@ -154,11 +192,11 @@ function buildDataTableStructure() {
         return {
             title: colName,
             data: colName,
-            defaultContent: "",
+            defaultContent: "-",
             render: function(data, type, row) {
-                if (data === undefined || data === null) return "";
+                if (data === undefined || data === null || data === "") return "-";
                 
-                // Normalisasi kolom Persentase Progres di baris tabel
+                // Atur Tampilan Desimal Persentase Progres agar Seragam & Cantik
                 if (colName.toLowerCase().includes("progres") || colName === "16.88%" || colName.toLowerCase().includes("persentase")) {
                     let num = parseFloat(data);
                     if (!isNaN(num)) {
@@ -168,8 +206,8 @@ function buildDataTableStructure() {
                     return data;
                 }
                 
-                // Format Angka Ribuan
-                if (type === 'display' && !isNaN(data) && data !== "" && colName !== "idsubsls" && !colName.toLowerCase().includes("date") && !colName.toLowerCase().includes("rank")) {
+                // Format Angka Ribuan untuk data numerik non-ID
+                if (type === 'display' && !isNaN(data) && colName !== "idsubsls" && !colName.toLowerCase().includes("date") && !colName.toLowerCase().includes("rank")) {
                     return Number(data).toLocaleString('id-ID');
                 }
                 return data;
@@ -208,11 +246,9 @@ function executeGlobalFilters() {
     
     table.columns().search('');
     
-    // Pencarian fuzzy safe match untuk menangani ketidaksesuaian spasi/emoji antar tab
     if (valSelected) {
         let idxKec = tableColumnsDefinition[currentTab].indexOf("Kecamatan");
         if (idxKec !== -1) {
-            // Gunakan metode Regex Parsial tanpa strict ^...$ agar lolos sinkronisasi
             table.column(idxKec).search(valSelected, true, false);
         }
     }
@@ -225,13 +261,11 @@ function renderDinamisChart(cleanWilayah) {
     let rawSheetData = globalData[currentTab] || [];
     let statusSelected = $('#filterAssignment').val();
 
-    // Buang baris total kabupaten
     let filtered = rawSheetData.filter(r => {
         let firstVal = Object.values(r)[0] || "";
         return !firstVal.toString().toLowerCase().includes("lampung timur");
     });
 
-    // Saring data grafik dengan metode fuzzy matching
     if (cleanWilayah) {
         filtered = filtered.filter(r => {
             if (!r["Kecamatan"]) return false;
