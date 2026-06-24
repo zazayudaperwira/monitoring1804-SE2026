@@ -25,18 +25,22 @@ function loadFromAPI() {
 function processData(res) {
     allData = res.data;
     $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
-    const kecs = [...new Set(allData.Kecamatan.map(d => d.Kecamatan))];
-    kecs.forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
+    // Pastikan data Kecamatan ada sebelum mengisi dropdown
+    if (allData.Kecamatan) {
+        const kecs = [...new Set(allData.Kecamatan.map(d => d.Kecamatan))];
+        kecs.forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
+    }
     switchTab('Kecamatan');
 }
 
+// Event Filter
 $('#fKec').change(function() { filterState.kec = $(this).val(); filterState.desa = ""; updateDesaDropdown(); applyFilters(); });
 $('#fDesa').change(function() { filterState.desa = $(this).val(); applyFilters(); });
 $('#fStat').change(function() { filterState.stat = $(this).val(); applyFilters(); });
 
 function updateDesaDropdown() {
     $('#fDesa').html('<option value="">Semua Desa</option>');
-    if (filterState.kec) {
+    if (filterState.kec && allData.Desa) {
         const desas = allData.Desa.filter(d => d.Kecamatan === filterState.kec);
         desas.forEach(d => $('#fDesa').append(`<option value="${d.Desa}">${d.Desa}</option>`));
     }
@@ -48,16 +52,28 @@ function applyFilters() {
 }
 
 function switchTab(sheet) {
+    if (!allData[sheet]) {
+        console.error("Data tab " + sheet + " kosong!");
+        return;
+    }
+
     $('.tab-btn').removeClass('bg-orange-600 text-white').addClass('bg-orange-100 text-orange-700');
     $(`button[onclick="switchTab('${sheet}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
 
-    if ($.fn.DataTable.isDataTable('#mainTable')) $('#mainTable').DataTable().destroy();
+    if ($.fn.DataTable.isDataTable('#mainTable')) {
+        $('#mainTable').DataTable().destroy();
+        $('#mainTable').empty();
+    }
+    
+    // Perbaikan SLS: Mendapatkan kunci kolom secara dinamis
+    const columns = Object.keys(allData[sheet][0]).map(k => ({ title: k, data: k }));
     
     $('#mainTable').DataTable({
         data: allData[sheet],
-        columns: Object.keys(allData[sheet][0] || {}).map(k => ({ title: k, data: k })),
+        columns: columns,
         scrollX: true,
-        deferRender: true, // Mempercepat render 6000+ baris
+        deferRender: true, 
+        destroy: true,
         initComplete: () => applyFilters()
     });
 }
