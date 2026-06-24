@@ -1,501 +1,113 @@
-const API =
-"https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
+const API = "https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
+let allData = {};
+let chart = null;
+let filterTimeout = null;
+const STATUS_COLS = ["OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas", "APPROVED BY Pengawas", "REVOKED BY Pengawas", "SUBMITTED RESPONDENT", "EDITED BY Pengawas"];
 
+$(document).ready(function() {
+    // Inisialisasi DataTable kosong di awal agar ada referensi tabel
+    $('#mainTable').DataTable({ data: [], columns: [] });
 
-let allData={};
-
-let chart=null;
-
-
-
-function getProgress(x){
-
-return Number(
-x.PROGRES ??
-x.Progres ??
-x["Persentase Progres"] ??
-0
-);
-
-}
-
-
-
-function persen(x){
-
-return (getProgress(x)*100)
-.toFixed(1)+"%";
-
-}
-
-
-
-
-
-
-$(async function(){
-
-
-let res =
-await fetch(API);
-
-
-let json =
-await res.json();
-
-
-
-allData=json.data;
-
-
-
-$("#updateInfo")
-.text(
-"Update : "+json.metadata.update
-);
-
-
-
-loadFilter();
-
-
-updateKPI();
-
-
-ranking();
-
-
-
-switchTab("Kecamatan");
-
-
-chartUpdate();
-
-
-
+    fetch(API).then(res => res.json()).then(res => {
+        allData = res.data;
+        $('#progressContainer').hide();
+        $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
+        
+        const kabData = allData.Kecamatan.find(d => d.Kecamatan === "Lampung Timur");
+        if(kabData) $('#kabProgres').text((Number(kabData.PROGRES) * 100).toFixed(1) + "%");
+        
+        [...new Set(allData.Kecamatan.map(d => d.Kecamatan))].forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
+        
+        switchTab('Kecamatan');
+        updateChart();
+        updateLeaderboard(); 
+    });
 });
 
-
-
-
-
-
-
-
-
-function updateKPI(){
-
-
-
-$("#totalSLS")
-.text(
-allData.SLS.length
-);
-
-
-
-let done =
-allData.SLS.reduce(
-(a,b)=>
-a+Number(
-b["APPROVED BY Pengawas"]||0
-),0);
-
-
-$("#totalDone")
-.text(done);
-
-
-
-
-let kab =
-allData.Kecamatan[0];
-
-
-$("#kabProgres")
-.text(
-persen(kab)
-);
-
-
-$("#progressCard")
-.text(
-persen(kab)
-);
-
-
-
+function switchTab(sheet) {
+    if (!allData[sheet]) return;
+    
+    // Update tombol
+    $('.tab-btn').removeClass('bg-orange-600 text-white').addClass('bg-orange-100 text-orange-700');
+    $(`button[onclick="switchTab('${sheet}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
+    
+    const table = $('#mainTable').DataTable();
+    
+    // 1. Bersihkan data lama
+    table.clear();
+    
+    // 2. Buat kolom baru berdasarkan data sheet yang dipilih
+    let cols = Object.keys(allData[sheet][0]).map(k => ({
+        title: k,
+        data: k,
+        render: (data) => (k.toUpperCase().includes('PROGRES') && typeof data === 'number') ? (data * 100).toFixed(1) + '%' : data
+    }));
+    
+    // 3. Update struktur tabel dengan kolom baru
+    table.destroy();
+    $('#mainTable').empty();
+    $('#mainTable').DataTable({
+        data: allData[sheet],
+        columns: cols,
+        scrollX: true
+    });
+    
+    applyFilters();
 }
 
+function updateLeaderboard() {
+    if (!allData.PETUGAS) return;
+    let sortedData = [...allData.PETUGAS].sort((a, b) => Number(b.PROGRES) - Number(a.PROGRES));
+    const renderTable = (data, elementId) => {
+        let html = `<table class="w-full text-left"><thead><tr class="border-b"><th class="py-2">Rank</th><th>Kecamatan</th><th>PPL</th><th>Progres</th></tr></thead><tbody>`;
+        data.forEach((d, i) => {
+            html += `<tr class="border-b"><td class="py-2 font-bold">${i+1}</td><td class="text-[10px]">${d.Kecamatan}</td><td class="font-semibold text-xs">${d.PPL}</td><td class="font-bold">${(Number(d.PROGRES)*100).toFixed(1)}%</td></tr>`;
+        });
+        $(`#${elementId}`).html(html + `</tbody></table>`);
+    };
+    renderTable(sortedData.slice(0, 10), 'topPetugas');
+    renderTable(sortedData.slice(-10).reverse(), 'bottomPetugas');
+}
 
+function updateChart() {
+    clearTimeout(filterTimeout);
+    filterTimeout = setTimeout(() => {
+        if (!allData.SLS) return;
+        const kec = $('#fKec').val();
+        const desa = $('#fDesa').val();
+        let filteredData = allData.SLS.filter(d => (kec === "" || d.Kecamatan.includes(kec)) && (desa === "" || d.Desa.includes(desa)));
+        let labels = [], datasets = STATUS_COLS.map((col, i) => ({ label: col, data: [], backgroundColor: `hsl(${(i * 45)}, 70%, 60%)` }));
 
+        if (kec === "") {
+            labels = ["Kabupaten"];
+            datasets.forEach(ds => ds.data = [filteredData.reduce((sum, d) => sum + (Number(d[ds.label]) || 0), 0)]);
+        } else if (desa === "") {
+            labels = allData.Desa.filter(d => d.Kecamatan === kec).map(d => d.Desa);
+            datasets.forEach(ds => ds.data = labels.map(dName => filteredData.filter(d => d.Desa === dName).reduce((sum, d) => sum + (Number(d[ds.label]) || 0), 0)));
+        } else {
+            const desaSLS = filteredData.filter(d => d.Desa === desa);
+            labels = desaSLS.map(d => d.nmsls);
+            datasets.forEach(ds => ds.data = desaSLS.map(d => Number(d[ds.label]) || 0));
+        }
 
+        if(chart) chart.destroy();
+        chart = new Chart(document.getElementById('progresChart').getContext('2d'), { type: 'bar', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } } });
+    }, 100);
+}
 
+function applyFilters() {
+    const table = $('#mainTable').DataTable();
+    table.search(`${$('#fKec').val()} ${$('#fDesa').val()}`.trim()).draw();
+}
 
-
-
-
-function loadFilter(){
-
-
-[...new Set(
-allData.Kecamatan.map(x=>x.Kecamatan)
-)]
-.forEach(x=>{
-
-
-$("#fKec")
-.append(
-`
-<option>
-${x}
-</option>
-`
-);
-
-
+$('#fKec').change(function() { 
+    $('#fDesa').html('<option value="">Semua Desa</option>');
+    allData.Desa.filter(d => d.Kecamatan === $(this).val()).forEach(d => $('#fDesa').append(`<option value="${d.Desa}">${d.Desa}</option>`));
+    updateChart(); applyFilters();
 });
-
-
-}
-
-
-
-
-
-
-
-
-
-function ranking(){
-
-
-
-render(
-[...allData.Kecamatan]
-.sort((a,b)=>
-getProgress(b)-getProgress(a)),
-"topKec",
-"Kecamatan"
-);
-
-
-
-render(
-[...allData.Desa]
-.sort((a,b)=>
-getProgress(b)-getProgress(a)),
-"topDesa",
-"Desa"
-);
-
-
-
-let ppl =
-[...allData.PETUGAS]
-.sort((a,b)=>
-getProgress(b)-getProgress(a));
-
-
-
-renderPPL(
-ppl,
-"topPetugas"
-);
-
-
-
-renderPPL(
-[...ppl].reverse(),
-"bottomPetugas"
-);
-
-
-
-}
-
-
-
-
-
-
-
-
-
-function render(data,id,type){
-
-
-$("#"+id)
-.html(
-
-data.slice(0,10)
-.map((x,i)=>`
-
-<div class="border-b py-3">
-
-<b>${i+1}</b>
-${x[type]}
-
-
-<br>
-
-<span class="text-gray-500 text-sm">
-
-PROGRES :
-${persen(x)}
-
-</span>
-
-
-</div>
-
-
-`)
-.join("")
-
-
-);
-
-
-}
-
-
-
-
-
-
-
-
-
-function renderPPL(data,id){
-
-
-$("#"+id)
-.html(
-
-data.slice(0,10)
-.map((x,i)=>`
-
-<div class="border-b py-3">
-
-
-<b>${i+1}</b>
-${x.PPL}
-
-
-<br>
-
-
-<span class="text-sm text-gray-500">
-
-${x.Kecamatan}
-
-
-<br>
-
-Persentase Progres :
-${persen(x)}
-
-</span>
-
-
-</div>
-
-
-`)
-.join("")
-
-
-);
-
-
-
-}
-
-
-
-
-
-
-
-
-
-function switchTab(sheet){
-
-
-
-if(
-$.fn.DataTable.isDataTable("#mainTable")
-){
-
-$("#mainTable")
-.DataTable()
-.destroy();
-
-
-}
-
-
-
-let data =
-allData[sheet];
-
-
-
-
-$("#mainTable")
-.DataTable({
-
-
-
-data:data,
-
-
-
-columns:
-
-Object.keys(data[0])
-.map(k=>({
-
-
-title:k,
-
-
-data:k,
-
-
-render:function(v){
-
-
-
-if(
-k=="PROGRES" ||
-k=="Progres" ||
-k=="Persentase Progres"
-)
-
-return (Number(v)*100).toFixed(1)+"%";
-
-
-return v;
-
-
-
-}
-
-
-})),
-
-
-pageLength:10,
-
-searching:true,
-
-ordering:true,
-
-scrollX:true
-
-
-
-});
-
-
-
-}
-
-
-
-
-
-
-
-
-
-function chartUpdate(){
-
-
-let data =
-allData.SLS;
-
-
-let desa =
-[...new Set(
-data.map(x=>x.Desa)
-)];
-
-
-
-let selesai =
-desa.map(d=>
-
-data.filter(x=>x.Desa==d)
-.reduce(
-(a,b)=>
-a+
-Number(
-b["APPROVED BY Pengawas"]||0
-),
-0)
-
-);
-
-
-
-if(chart)
-chart.destroy();
-
-
-
-chart =
-new Chart(
-document.getElementById("progresChart"),
-
-
-{
-
-
-type:"bar",
-
-
-data:{
-
-
-labels:desa,
-
-
-datasets:[{
-
-
-label:"Selesai",
-
-
-data:selesai
-
-
-}]
-
-
-}
-
-
-}
-
-);
-
-
-}
-
-
-
-
-
-
-function resetFilters(){
-
-$("#fKec").val("");
-
-$("#fDesa").val("");
-
-chartUpdate();
-
+$('#fDesa').change(() => { applyFilters(); updateChart(); });
+
+function resetFilters() {
+    $('#fKec').val(""); $('#fDesa').html('<option value="">Semua Desa</option>').val("");
+    updateChart(); applyFilters();
 }
