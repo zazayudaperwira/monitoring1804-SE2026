@@ -24,14 +24,13 @@
         table.dataTable td { border: 1px solid #e2e8f0 !important; padding: 6px 8px !important; }
         .dataTables_wrapper .dataTables_paginate .paginate_button.current { background: #2563eb !important; color: white !important; border: none !important; border-radius: 0.375rem; }
         
-        /* Gaya baris jika Target Harian Kurang (Belum Tercapai) */
+        /* Gaya baris jika Progres Kurang dari Target Harian */
         .row-target-failed { background-color: #fef2f2 !important; }
         .row-target-failed td { color: #dc2626 !important; font-weight: 600; border-color: #fee2e2 !important; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
 
-    <!-- Top Navbar -->
     <nav class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center py-3 gap-3">
             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
@@ -42,7 +41,6 @@
                 </div>
             </div>
             
-            <!-- PANEL FILTER UTAMA -->
             <div class="flex flex-wrap items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
                 <div class="flex items-center gap-1.5">
                     <label class="text-[11px] font-bold text-slate-500 uppercase">Filter Wilayah:</label>
@@ -70,7 +68,6 @@
 
     <main class="max-w-7xl mx-auto p-4 space-y-6">
         
-        <!-- REAL TIME PROGRESS LOADING BAR -->
         <div id="loader" class="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-slate-200 shadow-sm px-6">
             <div class="w-full max-w-md bg-slate-100 rounded-full h-3 mb-3 p-0.5 overflow-hidden border border-slate-200">
                 <div id="loadingProgressFill" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 5%"></div>
@@ -78,10 +75,8 @@
             <p id="loadingProgressText" class="text-xs font-bold text-slate-600 animate-pulse">Menghubungkan ke Google Spreadsheet (5%)...</p>
         </div>
 
-        <!-- Dashboard Layout -->
         <div id="dashboardContent" class="hidden space-y-6">
             
-            <!-- CARD UTAMA KABUPATEN -->
             <div class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-5 rounded-xl shadow-md flex justify-between items-center">
                 <div>
                     <h2 class="text-[10px] font-bold uppercase tracking-widest text-blue-200">Capaian Tingkat Kabupaten</h2>
@@ -99,7 +94,6 @@
                 </div>
             </div>
 
-            <!-- CHART BOX -->
             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
                 <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Visualisasi Sebaran Data Berdasarkan Filter</h3>
                 <div class="h-64 w-full">
@@ -107,9 +101,7 @@
                 </div>
             </div>
 
-            <!-- HIGHLIGHT RANKING 10 PPL TERTINGGI & TERENDAH -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Top 10 PPL -->
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div class="flex justify-between items-center border-b border-slate-100 pb-2">
                         <h3 class="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">🏆 10 PPL Progres Tertinggi</h3>
@@ -131,7 +123,6 @@
                     </div>
                 </div>
 
-                <!-- Bottom 10 PPL -->
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div class="flex justify-between items-center border-b border-slate-100 pb-2">
                         <h3 class="text-xs font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1">⚠️ 10 PPL Progres Terendah</h3>
@@ -154,7 +145,6 @@
                 </div>
             </div>
 
-            <!-- DATA TABLE PANEL -->
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div class="flex border-b border-slate-200 bg-slate-50 p-1.5 gap-1 overflow-x-auto">
                     <button onclick="switchTab('Kecamatan')" id="btn-Kecamatan" class="tab-btn px-4 py-1.5 text-xs font-bold rounded-md bg-blue-600 text-white shadow-sm">Kecamatan</button>
