@@ -5,28 +5,58 @@ let filterTimeout = null;
 const STATUS_COLS = ["OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas", "APPROVED BY Pengawas", "REVOKED BY Pengawas", "SUBMITTED RESPONDENT", "EDITED BY Pengawas"];
 
 $(document).ready(function() {
+    // Inisialisasi DataTable kosong di awal agar ada referensi tabel
+    $('#mainTable').DataTable({ data: [], columns: [] });
+
     fetch(API).then(res => res.json()).then(res => {
         allData = res.data;
         $('#progressContainer').hide();
         $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
         
-        // Perbaikan Progres Kabupaten menggunakan kunci PROGRES
         const kabData = allData.Kecamatan.find(d => d.Kecamatan === "Lampung Timur");
         if(kabData) $('#kabProgres').text((Number(kabData.PROGRES) * 100).toFixed(1) + "%");
         
         [...new Set(allData.Kecamatan.map(d => d.Kecamatan))].forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
         
-        $('#mainTable').DataTable({ data: [], columns: [], scrollX: true });
-
         switchTab('Kecamatan');
         updateChart();
         updateLeaderboard(); 
     });
 });
 
+function switchTab(sheet) {
+    if (!allData[sheet]) return;
+    
+    // Update tombol
+    $('.tab-btn').removeClass('bg-orange-600 text-white').addClass('bg-orange-100 text-orange-700');
+    $(`button[onclick="switchTab('${sheet}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
+    
+    const table = $('#mainTable').DataTable();
+    
+    // 1. Bersihkan data lama
+    table.clear();
+    
+    // 2. Buat kolom baru berdasarkan data sheet yang dipilih
+    let cols = Object.keys(allData[sheet][0]).map(k => ({
+        title: k,
+        data: k,
+        render: (data) => (k.toUpperCase().includes('PROGRES') && typeof data === 'number') ? (data * 100).toFixed(1) + '%' : data
+    }));
+    
+    // 3. Update struktur tabel dengan kolom baru
+    table.destroy();
+    $('#mainTable').empty();
+    $('#mainTable').DataTable({
+        data: allData[sheet],
+        columns: cols,
+        scrollX: true
+    });
+    
+    applyFilters();
+}
+
 function updateLeaderboard() {
     if (!allData.PETUGAS) return;
-    // Menggunakan kunci PROGRES sesuai data Anda
     let sortedData = [...allData.PETUGAS].sort((a, b) => Number(b.PROGRES) - Number(a.PROGRES));
     const renderTable = (data, elementId) => {
         let html = `<table class="w-full text-left"><thead><tr class="border-b"><th class="py-2">Rank</th><th>Kecamatan</th><th>PPL</th><th>Progres</th></tr></thead><tbody>`;
@@ -63,19 +93,6 @@ function updateChart() {
         if(chart) chart.destroy();
         chart = new Chart(document.getElementById('progresChart').getContext('2d'), { type: 'bar', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } } });
     }, 100);
-}
-
-function switchTab(sheet) {
-    if (!allData[sheet]) return;
-    $('.tab-btn').removeClass('bg-orange-600 text-white').addClass('bg-orange-100 text-orange-700');
-    $(`button[onclick="switchTab('${sheet}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
-    
-    const table = $('#mainTable').DataTable();
-    table.clear().columns().destroy();
-    table.settings()[0].aoColumns = Object.keys(allData[sheet][0]).map(k => ({ title: k, data: k }));
-    table.columns.adjust().draw();
-    table.rows.add(allData[sheet]).draw();
-    applyFilters();
 }
 
 function applyFilters() {
