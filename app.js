@@ -6,7 +6,6 @@ let globalData = {};
 let currentTab = "Kecamatan";
 let chartInstance = null;
 
-// Daftar Status Utama untuk Mapping Grafik
 const targetStatus = [
     "OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas", 
     "APPROVED BY Pengawas", "REVOKED BY Pengawas", "SUBMITTED RESPONDENT", "EDITED BY Pengawas"
@@ -17,7 +16,6 @@ const statusColors = {
     "APPROVED BY Pengawas": "#10b981", "REVOKED BY Pengawas": "#64748b", "SUBMITTED RESPONDENT": "#8b5cf6", "EDITED BY Pengawas": "#06b6d4"
 };
 
-// STRUKTUR MATRIKS KOLOM HARDCODE (Mencegah Acak-acakan)
 const tableColumnsDefinition = {
     "Kecamatan": [
         "Kecamatan", "OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas",
@@ -45,40 +43,72 @@ const tableColumnsDefinition = {
 };
 
 $(document).ready(function() {
-    loadDashboardSystem();
+    loadDashboardWithProgress();
     
-    // Trigger Filter Global
     $('#filterWilayah, #filterAssignment').change(function() {
         executeGlobalFilters();
     });
 });
 
-async function loadDashboardSystem() {
+// SIMULASI PROGRESS BAR REAL-TIME
+function updateProgressBar(percent, text) {
+    $('#loadingProgressFill').css('width', percent + '%');
+    $('#loadingProgressText').text(`${text} (${percent}%)`);
+}
+
+async function loadDashboardWithProgress() {
     try {
+        updateProgressBar(15, "Menghubungkan ke API server...");
         const response = await fetch(API_URL, { method: 'GET', redirect: 'follow' });
+        
+        updateProgressBar(45, "Data terunduh, menyusun struktur data...");
         globalData = await response.json();
         
-        document.getElementById('loader').classList.add('hidden');
-        document.getElementById('dashboardContent').classList.remove('hidden');
+        updateProgressBar(75, "Melakukan kalkulasi persentase wilayah...");
         
-        const time = new Date();
-        document.getElementById('txtLastUpdate').innerText = `Sync: ${time.toLocaleTimeString('id-ID')} WIB`;
+        // Membersihkan string pembersih spasi dan emoji di level Kecamatan
+        if (globalData["Kecamatan"]) {
+            globalData["Kecamatan"] = globalData["Kecamatan"].map(r => {
+                if (r["Kecamatan"]) {
+                    r["_CleanKecamatan"] = r["Kecamatan"].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
+                }
+                return r;
+            });
+        }
+
+        updateProgressBar(100, "Selesai! Membuka dashboard...");
         
-        renderKabupatenSummary();
-        buildWilayahDropdown();
-        switchTab("Kecamatan");
+        setTimeout(() => {
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('dashboardContent').classList.remove('hidden');
+            
+            const time = new Date();
+            document.getElementById('txtLastUpdate').innerText = `Sync: ${time.toLocaleTimeString('id-ID')} WIB`;
+            
+            renderKabupatenSummary();
+            buildWilayahDropdown();
+            switchTab("Kecamatan");
+        }, 400);
+
     } catch (e) {
         console.error(e);
-        document.getElementById('loader').innerHTML = `<p class="p-4 text-xs font-bold text-red-500">Koneksi Gagal. Cek setting Web App Apps Script Anda.</p>`;
+        $('#loadingProgressText').html(`<span class="text-red-500">Gagal memuat data. Cek Deployment Apps Script Anda.</span>`);
     }
 }
 
 function renderKabupatenSummary() {
     const kecData = globalData["Kecamatan"] || [];
-    const kabRow = kecData.find(r => Object.values(r).some(v => v.toString().toLowerCase().includes("lampung timur")));
+    const kabRow = kecData.find(r => r["Kecamatan"] && r["Kecamatan"].toString().toLowerCase().includes("lampung timur"));
+    
     if (kabRow) {
         document.getElementById('kabApproved').innerText = (parseInt(kabRow["APPROVED BY Pengawas"]) || 0).toLocaleString('id-ID');
-        document.getElementById('kabProgres').innerText = kabRow["PROGRES"] || kabRow["Progres"] || "0%";
+        
+        // FORMAT PERSENTASE 0.1133 -> 11.34% SECARA PRESISI
+        let rawProg = kabRow["PROGRES"] || kabRow["Progres"] || 0;
+        if (typeof rawProg === "string") rawProg = parseFloat(rawProg.replace(/[^0-9.]/g, ''));
+        if (rawProg < 1 && rawProg > 0) rawProg = rawProg * 100;
+        
+        document.getElementById('kabProgres').innerText = parseFloat(rawProg).toFixed(2) + "%";
     }
 }
 
@@ -88,16 +118,17 @@ function buildWilayahDropdown() {
     select.find('option:not(:first)').remove();
     
     kecData.forEach(row => {
-        let val = row["Kecamatan"];
-        if (val && !val.toLowerCase().includes("lampung timur")) {
-            select.append(`<option value="${val}">${val}</option>`);
+        let clean = row["_CleanKecamatan"];
+        let raw = row["Kecamatan"];
+        if (raw && !raw.toLowerCase().includes("lampung timur")) {
+            // value diisi kode bersih, text diisi text asli spreadsheet
+            select.append(`<option value="${clean}">${raw}</option>`);
         }
     });
 }
 
 function switchTab(tabName) {
     currentTab = tabName;
-    
     $('.tab-btn').removeClass('bg-blue-600 text-white shadow-sm').addClass('text-slate-600 hover:bg-slate-200');
     $(`#btn-${tabName}`).removeClass('text-slate-600 hover:bg-slate-200').addClass('bg-blue-600 text-white shadow-sm');
     
@@ -113,15 +144,12 @@ function buildDataTableStructure() {
         $('#mainDataTable').empty();
     }
 
-    if (rawSheetData.length === 0) return;
-
-    // Bersihkan row Kabupaten Lampung Timur agar tidak mengotori list tabel utama
-    rawSheetData = rawSheetData.filter(r => {
+    // Bersihkan row total Lampung Timur
+    let processedData = rawSheetData.filter(r => {
         let firstVal = Object.values(r)[0] || "";
         return !firstVal.toString().toLowerCase().includes("lampung timur");
     });
 
-    // Petakan Kolom Berdasarkan Urutan Hardcode
     const columnsConfig = allowedColumns.map(colName => {
         return {
             title: colName,
@@ -130,13 +158,16 @@ function buildDataTableStructure() {
             render: function(data, type, row) {
                 if (data === undefined || data === null) return "";
                 
-                // Format Persentase
-                if (colName.toLowerCase().includes("progres") || colName === "16.88%") {
-                    if (!isNaN(data) && data !== "") {
-                        return (parseFloat(data) * (data <= 1 ? 100 : 1)).toFixed(2) + "%";
+                // Normalisasi kolom Persentase Progres di baris tabel
+                if (colName.toLowerCase().includes("progres") || colName === "16.88%" || colName.toLowerCase().includes("persentase")) {
+                    let num = parseFloat(data);
+                    if (!isNaN(num)) {
+                        if (num <= 1 && num > 0) num = num * 100;
+                        return num.toFixed(2) + "%";
                     }
                     return data;
                 }
+                
                 // Format Angka Ribuan
                 if (type === 'display' && !isNaN(data) && data !== "" && colName !== "idsubsls" && !colName.toLowerCase().includes("date") && !colName.toLowerCase().includes("rank")) {
                     return Number(data).toLocaleString('id-ID');
@@ -147,23 +178,22 @@ function buildDataTableStructure() {
     });
 
     $('#mainDataTable').DataTable({
-        data: rawSheetData,
+        data: processedData,
         columns: columnsConfig,
         dom: 'Bfrtip',
         buttons: [
-            { extend: 'excelHtml5', title: `Data_${currentTab}`, className: 'bg-emerald-600 text-white text-[11px] px-3 py-1.5 rounded hover:bg-emerald-700 font-medium transition' }
+            { extend: 'excelHtml5', title: `Data_Monitoring_${currentTab}`, className: 'bg-emerald-600 text-white text-[11px] px-3 py-1.5 rounded hover:bg-emerald-700 font-medium transition' }
         ],
         pageLength: 10,
         scrollX: true,
         createdRow: function(row, data, dataIndex) {
-            // CONDITIONAL FORMATTING JIKA APPROVED MASIH RENDAH
             let app = parseInt(data["APPROVED BY Pengawas"]) || 0;
             let open = parseInt(data["OPEN"]) || 0;
             let total = app + open;
             if (total > 0 && (app / total) < 0.2) {
-                $(row).addClass('bg-red-50');
+                $(row).addClass('bg-red-50/70');
             } else if (total > 0 && (app / total) >= 0.8) {
-                $(row).addClass('bg-emerald-50/60');
+                $(row).addClass('bg-emerald-50/40');
             }
         }
     });
@@ -174,57 +204,58 @@ function buildDataTableStructure() {
 
 function executeGlobalFilters() {
     const table = $('#mainDataTable').DataTable();
-    let wilayah = $('#filterWilayah').val();
+    let valSelected = $('#filterWilayah').val(); 
     
-    // 1. Filter Kolom Wilayah Kecamatan di Tabel
     table.columns().search('');
-    if (wilayah) {
+    
+    // Pencarian fuzzy safe match untuk menangani ketidaksesuaian spasi/emoji antar tab
+    if (valSelected) {
         let idxKec = tableColumnsDefinition[currentTab].indexOf("Kecamatan");
-        if (idxKec !== -1) table.column(idxKec).search('^' + wilayah + '$', true, false);
+        if (idxKec !== -1) {
+            // Gunakan metode Regex Parsial tanpa strict ^...$ agar lolos sinkronisasi
+            table.column(idxKec).search(valSelected, true, false);
+        }
     }
     table.draw();
 
-    // 2. Filter Sisi Grafik Berdasarkan Hasil Filter Wilayah & Status Assignment
-    renderDinamisChart(wilayah);
+    renderDinamisChart(valSelected);
 }
 
-function renderDinamisChart(wilayahSelected) {
+function renderDinamisChart(cleanWilayah) {
     let rawSheetData = globalData[currentTab] || [];
     let statusSelected = $('#filterAssignment').val();
 
-    // Buang row total kabupaten
+    // Buang baris total kabupaten
     let filtered = rawSheetData.filter(r => {
         let firstVal = Object.values(r)[0] || "";
         return !firstVal.toString().toLowerCase().includes("lampung timur");
     });
 
-    // Saring data berdasarkan filter wilayah yang aktif
-    if (wilayahSelected) {
-        filtered = filtered.filter(r => r["Kecamatan"] === wilayahSelected);
+    // Saring data grafik dengan metode fuzzy matching
+    if (cleanWilayah) {
+        filtered = filtered.filter(r => {
+            if (!r["Kecamatan"]) return false;
+            let targetClean = r["Kecamatan"].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
+            return targetClean.toLowerCase().includes(cleanWilayah.toLowerCase());
+        });
     }
 
-    // Tentukan sumbu X sumbu Utama
     let labelKey = "Kecamatan";
     if (currentTab === "Desa") labelKey = "Desa";
     if (currentTab === "PETUGAS") labelKey = "PPL";
     if (currentTab === "SLS") labelKey = "nmsls";
 
-    // Limit tampilan grafik max 15 item teratas agar rapi
     let sliceData = filtered.slice(0, 15);
     let labelsX = sliceData.map(r => (r[labelKey] || 'Unknown').toString().replace(/\[.*?\]\s*/g, ''));
 
-    // Siapkan Dataset Grafik Stacked
     let datasets = [];
-    
     if (statusSelected) {
-        // Jika filter assignment dipilih, hanya tampilkan 1 bar status tersebut
         datasets = [{
             label: statusSelected,
             data: sliceData.map(r => parseInt(r[statusSelected]) || 0),
             backgroundColor: statusColors[statusSelected] || '#3b82f6'
         }];
     } else {
-        // Jika kosong, tampilkan sebaran ke-8 status bertumpuk (stacked)
         datasets = targetStatus.map(status => {
             return {
                 label: status,
