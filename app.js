@@ -1,44 +1,48 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbyG5sC5JFMHSr0725mGPPVQDDjQQswm9sjDQPXzvXI_HnA8oMLS-5JhbSLNyBze06C1vA/exec";
+const API = "https://script.google.com/macros/s/AKfycbw5gYyAM9v5JxW_70_TeBOyGB1yIAfqixzUgUp98BXPG50LNNQdz9Pr5uHrk_pXzRy4-A/exec";
 let allData = {};
 
-$(document).ready(async () => {
-    try {
-        const response = await fetch(API_URL);
-        allData = await response.json();
-        
-        $('#loader').fadeOut();
-        // Memuat tab default saat pertama kali dibuka
-        loadTable('Kecamatan');
-    } catch (e) { 
-        $('#loader').hide(); 
-        console.error("Gagal memuat data:", e); 
-    }
-});
+async function init() {
+    // Simulasi loading progres
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += 10;
+        $('#progress-bar').css('width', progress + '%');
+        $('#perc').text(progress);
+        if (progress >= 90) clearInterval(interval);
+    }, 200);
 
-function loadTable(sheetName) {
-    // 1. Validasi: Pastikan data untuk sheet tersebut ada
-    if (!allData[sheetName]) {
-        console.error("Data untuk sheet " + sheetName + " tidak ditemukan di API!");
-        return;
-    }
-
-    // 2. Styling Tab (Warna Aktif)
-    $('.tab-btn').removeClass('bg-orange-600 text-white').addClass('bg-orange-100 text-orange-700');
-    $(`button[onclick="loadTable('${sheetName}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
-
-    // 3. Ambil data spesifik per sheet
-    const data = allData[sheetName];
-
-    // 4. Hancurkan tabel lama & buat tabel baru
-    if ($.fn.DataTable.isDataTable('#mainDataTable')) {
-        $('#mainDataTable').DataTable().destroy();
-    }
+    const res = await fetch(API);
+    allData = await res.json();
     
-    $('#mainDataTable').DataTable({
-        data: data,
-        columns: Object.keys(data[0] || {}).map(k => ({ title: k, data: k })),
-        scrollX: true,
-        destroy: true,
-        pageLength: 10
+    $('#progress-bar').css('width', '100%');
+    $('#perc').text(100);
+    $('#loader').fadeOut();
+
+    $('#updateInfo').text("Update Terakhir: " + allData.metadata.update);
+    setupFilters();
+    switchTab('Kecamatan');
+}
+
+function setupFilters() {
+    const kecs = [...new Set(allData.data.Kecamatan.map(d => d.Kecamatan))];
+    kecs.forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
+    
+    $('#fKec').change(() => {
+        const selected = $('#fKec').val();
+        $('#fDesa').html('<option value="">Semua Desa</option>');
+        const desas = allData.data.Desa.filter(d => d.Kecamatan.includes(selected));
+        desas.forEach(d => $('#fDesa').append(`<option value="${d.Desa}">${d.Desa}</option>`));
     });
 }
+
+function switchTab(sheet) {
+    const table = $('#mainTable').DataTable();
+    table.destroy();
+    $('#mainTable').DataTable({
+        data: allData.data[sheet],
+        columns: Object.keys(allData.data[sheet][0]).map(k => ({ title: k, data: k })),
+        scrollX: true
+    });
+}
+
+$(document).ready(init);
