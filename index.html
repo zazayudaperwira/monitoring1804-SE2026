@@ -1,12 +1,14 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring 1804</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 </head>
-<body class="bg-orange-50 p-6">
-    <div id="loader" class="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
+<body class="bg-orange-50 p-4 md:p-6">
+    <div id="loader" class="fixed inset-0 bg-white flex flex-col items-center justify-center z-[9999]">
         <div class="w-64 h-4 bg-orange-100 rounded-full overflow-hidden">
             <div id="progress-bar" class="h-full bg-orange-600 w-0 transition-all duration-300"></div>
         </div>
@@ -16,24 +18,28 @@
     <div class="max-w-7xl mx-auto space-y-6">
         <div class="bg-gradient-to-r from-orange-600 to-orange-400 p-8 rounded-3xl text-white shadow-lg">
             <h1 class="text-3xl font-black">MONITORING 1804</h1>
-            <p id="updateInfo" class="opacity-80"></p>
+            <p id="updateInfo" class="opacity-80 text-sm mt-1">Memuat informasi update...</p>
         </div>
 
-        <div class="grid grid-cols-3 gap-4">
-            <select id="fKec" class="p-3 rounded-xl border"><option value="">Pilih Kecamatan</option></select>
-            <select id="fDesa" class="p-3 rounded-xl border"><option value="">Pilih Desa</option></select>
-            <select id="fStat" class="p-3 rounded-xl border"><option value="">Pilih Status</option></select>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <select id="fKec" class="p-3 rounded-xl border border-orange-200"><option value="">Semua Kecamatan</option></select>
+            <select id="fDesa" class="p-3 rounded-xl border border-orange-200"><option value="">Semua Desa</option></select>
+            <select id="fStat" class="p-3 rounded-xl border border-orange-200"><option value="">Semua Status</option></select>
         </div>
 
-        <div class="bg-white p-6 rounded-3xl shadow-sm border">
-            <div class="flex gap-2 mb-4 overflow-x-auto">
-                <button onclick="switchTab('Kecamatan')" class="tab-btn bg-orange-600 text-white px-4 py-2 rounded-lg">Kecamatan</button>
-                <button onclick="switchTab('Desa')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg">Desa</button>
+        <div class="bg-white p-6 rounded-3xl shadow-sm border border-orange-100 overflow-x-auto">
+            <div class="flex gap-2 mb-6">
+                <button onclick="switchTab('Kecamatan')" class="tab-btn bg-orange-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Kecamatan</button>
+                <button onclick="switchTab('Desa')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold text-sm">Desa</button>
+                <button onclick="switchTab('PETUGAS')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold text-sm">Petugas</button>
+                <button onclick="switchTab('SLS')" class="tab-btn bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold text-sm">SLS</button>
             </div>
-            <table id="mainTable" class="w-full text-xs"></table>
+            <table id="mainTable" class="w-full text-xs display"></table>
         </div>
     </div>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
