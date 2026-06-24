@@ -30,6 +30,12 @@ $(document).ready(function() {
     loadDashboardWithProgress();
     startSyncTimer();
     $('#filterWilayah, #filterAssignment').change(function() { executeGlobalFilters(); });
+    
+    // Pasang event handler untuk perpindahan tab HTML manual Anda
+    $('#btn-Kecamatan').click(function() { switchTab('Kecamatan'); });
+    $('#btn-Desa').click(function() { switchTab('Desa'); });
+    $('#btn-Petugas, #btn-PETUGAS').click(function() { switchTab('PETUGAS'); });
+    $('#btn-SLS').click(function() { switchTab('SLS'); });
 });
 
 function startSyncTimer() {
@@ -52,21 +58,41 @@ function updateProgressBar(percent, text) {
     $('#loadingProgressText').text(`${text} (${percent}%)`);
 }
 
+function ekstrakDataDariJSON(jsonObj, targetKey) {
+    if (!jsonObj || typeof jsonObj !== 'object') return null;
+    if (jsonObj[targetKey] && Array.isArray(jsonObj[targetKey])) return jsonObj[targetKey];
+    
+    let keys = Object.keys(jsonObj);
+    let matchedKey = keys.find(k => k.toLowerCase().trim() === targetKey.toLowerCase());
+    if (matchedKey && Array.isArray(jsonObj[matchedKey])) return jsonObj[matchedKey];
+    
+    for (let k of keys) {
+        if (jsonObj[k] && typeof jsonObj[k] === 'object' && !Array.isArray(jsonObj[k])) {
+            let res = ekstrakDataDariJSON(jsonObj[k], targetKey);
+            if (res) return res;
+        }
+    }
+    return null;
+}
+
 async function loadDashboardWithProgress() {
     try {
         updateProgressBar(15, "Menghubungkan ke API server...");
         const response = await fetch(API_URL, { method: 'GET', redirect: 'follow' });
-        globalData = await response.json();
+        const rawJson = await response.json();
         
-        updateProgressBar(60, "Mendownload & Memproses skema data...");
-        
-        // Cari info KONDISI waktu data otomatis
-        Object.keys(globalData).forEach(sheet => {
-            if (globalData[sheet] && globalData[sheet].length > 0) {
-                let found = Object.keys(globalData[sheet][0]).find(k => k.toString().toUpperCase().includes("KONDISI"));
-                if (found) spreadsheetInfoTime = found.trim();
-            }
-        });
+        updateProgressBar(60, "Mengekstraksi & menyelaraskan struktur data...");
+
+        globalData = {
+            "Kecamatan": ekstrakDataDariJSON(rawJson, "Kecamatan") || [],
+            "Desa": ekstrakDataDariJSON(rawJson, "Desa") || [],
+            "PETUGAS": ekstrakDataDariJSON(rawJson, "PETUGAS") || ekstrakDataDariJSON(rawJson, "Petugas") || [],
+            "SLS": ekstrakDataDariJSON(rawJson, "SLS") || []
+        };
+
+        if (Array.isArray(rawJson) && globalData["Kecamatan"].length === 0) {
+            globalData["Kecamatan"] = rawJson;
+        }
 
         normalizeRowKeys();
         updateProgressBar(100, "Selesai! Menampilkan data...");
@@ -74,7 +100,6 @@ async function loadDashboardWithProgress() {
         setTimeout(() => {
             $('#loader').addClass('hidden');
             $('#dashboardContent').removeClass('hidden');
-            document.getElementById('txtLastUpdate').innerText = spreadsheetInfoTime;
             
             try { renderKabupatenSummary(); } catch(e) { console.error(e); }
             try { buildWilayahDropdown(); } catch(e) { console.error(e); }
@@ -82,47 +107,50 @@ async function loadDashboardWithProgress() {
             switchTab(currentTab);
         }, 400);
     } catch (e) {
-        console.error(e);
-        $('#loadingProgressText').html(`<span class="text-red-500">Gagal mensinkronkan data spreadsheet.</span>`);
+        console.error("Gagal total memuat data:", e);
+        $('#loadingProgressText').html(`<span class="text-red-500 font-bold">Gagal mensinkronkan data. Pastikan Web App GAS diset 'Anyone'.</span>`);
     }
 }
 
-// Fungsi bantu untuk membersihkan teks key kolom agar bisa dicocokkan dengan adil
 function cleanStringKey(str) {
     if (!str) return "";
     return str.toString().toLowerCase().replace(/[^a-z0-9]/g, '').trim();
 }
 
-// SMART RE-MAPPING: Menjamin properti objek apa pun formatnya dari GAS akan dipetakan ke Standar Standar UI
 function normalizeRowKeys() {
     Object.keys(globalData).forEach(sheetName => {
+        if (!globalData[sheetName]) return;
         globalData[sheetName] = globalData[sheetName].map(row => {
             let newRow = {};
-            
-            // Ambil semua key asli bawaan data baris ini
             let originalKeys = Object.keys(row);
 
-            // 1. Petakan Status-status Utama Terlebih Dahulu secara Case-Insensitive & Spaceless
+            // 1. Petakan Status Utama
             targetStatus.forEach(status => {
                 let matchedKey = originalKeys.find(k => cleanStringKey(k) === cleanStringKey(status));
                 newRow[status] = matchedKey ? row[matchedKey] : (row[status] || 0);
             });
 
-            // 2. Petakan kolom-kolom fundamental lainnya
+            // 2. Petakan kolom fundamental
             let allStandardFields = ["Kecamatan", "Desa", "PML", "PPL", "idsubsls", "nmsls", "jenis", "Keterangan", "Pengawas - Email", "Pencacah - Email", "Only Open", "Only Open [SLS]", "Rank"];
             allStandardFields.forEach(field => {
                 let matchedKey = originalKeys.find(k => cleanStringKey(k) === cleanStringKey(field));
                 newRow[field] = matchedKey ? row[matchedKey] : (row[field] || "");
             });
 
-            // Buat clean kecamatan untuk filter dropdown
             if (newRow["Kecamatan"]) {
                 newRow["_CleanKecamatan"] = newRow["Kecamatan"].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
             } else {
-                newRow["_CleanKecamatan"] = "";
+                let anyKecKey = originalKeys.find(k => k.toLowerCase().includes("kecamatan"));
+                if (anyKecKey && row[anyKecKey]) {
+                    newRow["Kecamatan"] = row[anyKecKey];
+                    newRow["_CleanKecamatan"] = row[anyKecKey].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
+                } else {
+                    newRow["_CleanKecamatan"] = "";
+                    newRow["Kecamatan"] = "";
+                }
             }
 
-            // 3. Deteksi Otomatis Kolom Progres Dinamis
+            // 3. Deteksi Otomatis Kolom Progres
             let progKey = originalKeys.find(k => {
                 let ck = cleanStringKey(k);
                 return ck.includes("progres") || ck.includes("persentase");
@@ -130,9 +158,8 @@ function normalizeRowKeys() {
             let rawProgVal = progKey ? row[progKey] : 0;
             newRow["_MAPPED_PROGRES"] = rawProgVal;
             newRow["PROGRES"] = rawProgVal;
-            newRow["Persentase Progres"] = rawProgVal;
 
-            // 4. Deteksi Otomatis Kolom Target Harian Dinamis (Bebas dari pengaruh tanggal)
+            // 4. Deteksi Otomatis Kolom Target Harian
             let targetKey = originalKeys.find(k => {
                 let ck = cleanStringKey(k);
                 return ck.includes("target") || ck.includes("harian");
@@ -141,17 +168,13 @@ function normalizeRowKeys() {
             newRow["_MAPPED_TARGET"] = rawTargetVal;
             newRow["Target Harian"] = rawTargetVal;
             
-            // Simpan nama kolom target asli (misal "Target Harian 23-06-2026") agar judul tabel dinamis bisa mengikutinya
             if (targetKey) {
                 newRow["_ORIGINAL_TARGET_NAME"] = targetKey;
                 newRow[targetKey] = rawTargetVal;
             }
 
-            // Copy sisa properti lain yang tidak tercover agar tidak hilang
             originalKeys.forEach(k => {
-                if (!newRow.hasOwnProperty(k)) {
-                    newRow[k] = row[k];
-                }
+                if (!newRow.hasOwnProperty(k)) newRow[k] = row[k];
             });
 
             return newRow;
@@ -163,13 +186,15 @@ function renderKabupatenSummary() {
     const kecData = globalData["Kecamatan"] || [];
     if (kecData.length === 0) return;
     
-    const kabRow = kecData.find(r => r["Kecamatan"] && (
-        r["Kecamatan"].toString().toLowerCase().includes("lampung timur") || 
-        r["Kecamatan"].toString().toLowerCase().includes("total")
-    ));
+    // Ganti teks pencarian baris total secara defensif (mengabaikan spasi/newline)
+    const kabRow = kecData.find(r => {
+        let txt = cleanStringKey(r["Kecamatan"] || "");
+        return txt.includes("lampungtimur") || txt.includes("total") || txt.includes("kabupaten");
+    });
     
     if (kabRow) {
-        document.getElementById('kabApproved').innerText = (parseInt(kabRow["APPROVED BY Pengawas"]) || 0).toLocaleString('id-ID');
+        let appVal = kabRow["APPROVED BY Pengawas"] || 0;
+        document.getElementById('kabApproved').innerText = parseInt(appVal).toLocaleString('id-ID');
         let num = parseToPureNumeric(kabRow["_MAPPED_PROGRES"]);
         document.getElementById('kabProgres').innerText = num.toFixed(2) + "%";
     }
@@ -177,7 +202,6 @@ function renderKabupatenSummary() {
 
 function buildWilayahDropdown() {
     const select = $('#filterWilayah');
-    const currVal = select.val();
     select.find('option:not(:first)').remove();
     
     let addedKec = new Set();
@@ -188,21 +212,21 @@ function buildWilayahDropdown() {
         let raw = row["Kecamatan"];
         
         if (raw && clean && clean !== "") {
-            let rawStr = raw.toString().toLowerCase();
-            if (!rawStr.includes("lampung timur") && !rawStr.includes("total") && !rawStr.includes("kabupaten") && !addedKec.has(clean)) {
+            let txt = cleanStringKey(raw);
+            if (!txt.includes("lampungtimur") && !txt.includes("total") && !txt.includes("kabupaten") && !addedKec.has(clean)) {
                 select.append(`<option value="${clean}">${raw}</option>`);
                 addedKec.add(clean);
             }
         }
     });
-    
-    if(currVal) select.val(currVal);
 }
 
 function switchTab(tabName) {
     currentTab = tabName;
     $('.tab-btn').removeClass('bg-blue-600 text-white shadow-sm').addClass('text-slate-600 hover:bg-slate-200');
-    $(`#btn-${tabName}`).removeClass('text-slate-600 hover:bg-slate-200').addClass('bg-blue-600 text-white shadow-sm');
+    
+    // Dukung selektor id case-insensitive untuk elemen tab Anda
+    $(`#btn-${tabName}, #btn-${tabName.toLowerCase()}`).removeClass('text-slate-600 hover:bg-slate-200').addClass('bg-blue-600 text-white shadow-sm');
     buildDataTableStructure();
 }
 
@@ -211,43 +235,45 @@ function parseToPureNumeric(val) {
     let clean = val.toString().replace(/[^0-9.]/g, '');
     let num = parseFloat(clean);
     if (isNaN(num)) return 0;
-    if (num <= 1 && num > 0) num = num * 100; 
+    if (num <= 1 && num > 0 && val.toString().includes('%')) {
+        // Biarkan jika berbentuk desimal murni persen
+    } else if (num <= 1 && num > 0) {
+        num = num * 100;
+    }
     return num;
 }
 
 function buildDataTableStructure() {
     let rawSheetData = globalData[currentTab] || [];
     
+    // Hancurkan DataTable lama secara menyeluruh sebelum membuat yang baru
     if ($.fn.DataTable.isDataTable('#mainDataTable')) {
-        $('#mainDataTable').DataTable().destroy();
+        $('#mainDataTable').DataTable().clear().destroy();
         $('#mainDataTable').empty();
     }
 
-    // Filter baris total kabupaten agar tidak mengotori tabel utama
+    // Filter baris agar baris "Total Kabupaten" tidak ikut masuk ke baris list kecamatan/desa biasa
     let processedData = rawSheetData.filter(r => {
         let firstVal = r["Kecamatan"] || Object.values(r)[0] || "";
-        let txt = firstVal.toString().toLowerCase();
-        return !txt.includes("lampung timur") && !txt.includes("total");
+        let txt = cleanStringKey(firstVal);
+        return txt !== "" && !txt.includes("lampungtimur") && !txt.includes("total") && !txt.includes("kabupaten");
     });
 
     let sampleRow = processedData[0] || {};
-    
-    // Cari penamaan kolom riil dari data
     let realProgKey = "PROGRES";
     let realTargetKey = sampleRow["_ORIGINAL_TARGET_NAME"] || "Target Harian";
 
     let dynamicColumns = [...(baseColumnsConfig[currentTab] || [])];
-    
     if (currentTab !== "SLS") {
         if (!dynamicColumns.includes(realProgKey)) dynamicColumns.push(realProgKey);
         if (!dynamicColumns.includes(realTargetKey)) dynamicColumns.push(realTargetKey);
     }
 
     const columnsConfig = dynamicColumns.map(colName => {
-        // Tampilkan judul kolom target secara dinamis sesuai tanggal sheet asli
         let displayTitle = colName;
         if (colName === "Target Harian" && sampleRow["_ORIGINAL_TARGET_NAME"]) {
-            displayTitle = sampleRow["_ORIGINAL_TARGET_NAME"];
+            // Bersihkan teks nama kolom target harian jika mengandung baris baru/tanggal agar rapi di header tabel
+            displayTitle = sampleRow["_ORIGINAL_TARGET_NAME"].toString().replace(/[\r\n]+/g, ' ');
         }
 
         return {
@@ -255,14 +281,13 @@ function buildDataTableStructure() {
             data: colName,
             defaultContent: "0",
             render: function(data, type, row) {
-                // Gunakan backup mapper jika pemanggilan langsung mengembalikan nilai kosong
                 let finalVal = data;
                 if (colName === "PROGRES") finalVal = row["_MAPPED_PROGRES"];
                 if (colName === realTargetKey || colName === "Target Harian") finalVal = row["_MAPPED_TARGET"];
 
                 if (finalVal === undefined || finalVal === null || finalVal === "") return "0";
                 
-                if (colName === "PROGRES" || colName === "Target Harian" || colName === realTargetKey) {
+                if (colName === "PROGRES" || colName === "Target Harian" || colName === realTargetKey || colName.toLowerCase().includes("progres")) {
                     let num = parseToPureNumeric(finalVal);
                     return num.toFixed(2) + "%";
                 }
@@ -298,13 +323,15 @@ function buildDataTableStructure() {
 }
 
 function executeGlobalFilters() {
+    if (!$.fn.DataTable.isDataTable('#mainDataTable')) return;
+    
     const table = $('#mainDataTable').DataTable();
     let valSelected = $('#filterWilayah').val(); 
     table.columns().search('');
     
     if (valSelected) {
         let currentCols = table.settings().init().columns;
-        let idxKec = currentCols.findIndex(c => c.title === "Kecamatan");
+        let idxKec = currentCols.findIndex(c => c.title.toLowerCase().includes("kecamatan"));
         if (idxKec !== -1) table.column(idxKec).search(valSelected, true, false);
     }
     table.draw();
@@ -359,8 +386,8 @@ function renderDinamisChart(cleanWilayah) {
 
     let filtered = rawSheetData.filter(r => {
         let firstVal = r["Kecamatan"] || Object.values(r)[0] || "";
-        let txt = firstVal.toString().toLowerCase();
-        return !txt.includes("lampung timur") && !txt.includes("total");
+        let txt = cleanStringKey(firstVal);
+        return txt !== "" && !txt.includes("lampungtimur") && !txt.includes("total") && !txt.includes("kabupaten");
     });
 
     if (cleanWilayah) {
@@ -379,7 +406,7 @@ function renderDinamisChart(cleanWilayah) {
     let labelsX = sliceData.map(r => (r[labelKey] || 'Unknown').toString().replace(/\[.*?\]\s*/g, ''));
 
     let datasets = [];
-    if (statusSelected) {
+    if (statusSelected && statusSelected !== "Semua Status") {
         datasets = [{ label: statusSelected, data: sliceData.map(r => parseInt(r[statusSelected]) || 0), backgroundColor: statusColors[statusSelected] || '#3b82f6' }];
     } else {
         datasets = targetStatus.map(status => {
