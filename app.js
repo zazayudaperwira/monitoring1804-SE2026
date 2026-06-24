@@ -53,221 +53,147 @@ updateKPI();
 
 loadFilter();
 
-
-updateRanking();
-
-
-switchTab("Kecamatan");
+function updateRanking(){
 
 
-});
-
-
-
-
-
-
-
-
-
-function updateKPI(){
-
-
-$("#totalSLS")
-.text(allData.SLS.length);
-
-
-
-let selesai =
-allData.SLS.reduce(
+let kec =
+[...allData.Kecamatan]
+.sort(
 (a,b)=>
-a+
-Number(
-b["APPROVED BY Pengawas"]||0
-),
-0
-);
-
-
-$("#totalDone")
-.text(selesai);
-
-
-
-let p =
-allData.Kecamatan[0];
-
-
-if(p){
-
-$("#kabProgres")
-.text(persen(p));
-
-
-$("#progressCard")
-.text(persen(p));
-
-}
-
-
-}
-
-
-
-
-
-
-
-
-
-function loadFilter(){
-
-
-
-$("#fKec")
-.empty()
-.append(
-`<option value="">
-Semua Kecamatan
-</option>`
+getProgress(b)-getProgress(a)
 );
 
 
 
-[...new Set(
-allData.Kecamatan.map(x=>x.Kecamatan)
-)]
-.forEach(k=>{
-
-
-$("#fKec")
-.append(
-`
-<option value="${k}">
-${k}
-</option>
-`
+let desa =
+[...allData.Desa]
+.sort(
+(a,b)=>
+getProgress(b)-getProgress(a)
 );
 
 
-});
 
-
-
-}
-
-
-
-
-
-// FILTER KECAMATAN
-
-$("#fKec").on("change",function(){
-
-
-let val=$(this).val();
-
-
-
-let data;
-
-
-
-if(val===""){
-
-
-data=allData.Kecamatan;
-
-
-}else{
-
-
-data=
-allData.Kecamatan
-.filter(x=>
-x.Kecamatan===val
+let ppl =
+[...allData.PETUGAS]
+.sort(
+(a,b)=>
+getProgress(b)-getProgress(a)
 );
+
+
+
+
+
+renderWilayah(
+kec,
+"topKecamatan",
+5,
+"Kecamatan"
+);
+
+
+
+renderWilayah(
+[...kec].reverse(),
+"bottomKecamatan",
+5,
+"Kecamatan"
+);
+
+
+
+
+
+renderWilayah(
+desa,
+"topDesa",
+5,
+"Desa"
+);
+
+
+
+renderWilayah(
+[...desa].reverse(),
+"bottomDesa",
+5,
+"Desa"
+);
+
+
+
+
+
+renderPPL(
+ppl,
+"topPetugas"
+);
+
+
+
+renderPPL(
+[...ppl].reverse(),
+"bottomPetugas"
+);
+
 
 
 }
 
 
 
-reloadTable(data);
-
-
-});
 
 
 
+function renderWilayah(data,id,jumlah,namaField){
 
 
-
-
-
-
-function switchTab(sheet){
-
-
-if(!allData[sheet])
+if(!$("#"+id).length)
 return;
 
 
 
-reloadTable(
-allData[sheet]
+$("#"+id).html(
+
+data.slice(0,jumlah)
+.map((x,i)=>{
+
+
+return `
+
+<div class="border-b py-2">
+
+
+<b>
+${i+1}. ${x[namaField]}
+</b>
+
+
+<br>
+
+
+<span class="text-gray-500">
+
+PROGRES :
+${persen(x)}
+
+</span>
+
+
+</div>
+
+`;
+
+
+})
+.join("")
+
 );
 
 
-}
-
-
-
-
-
-function reloadTable(data){
-
-
-
-if(
-$.fn.DataTable.isDataTable("#mainTable")
-){
-
-$("#mainTable")
-.DataTable()
-.clear()
-.destroy();
 
 }
-
-
-
-$("#mainTable")
-.empty();
-
-
-
-currentTable=
-$("#mainTable")
-.DataTable({
-
-
-data:data,
-
-
-columns:
-
-
-Object.keys(data[0])
-.map(col=>({
-
-
-title:col,
-
-
-data:col,
-
-
 render:function(v){
 
 
