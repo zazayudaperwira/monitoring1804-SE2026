@@ -2,10 +2,16 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbyj21A-KOVdCL5RMLjKwEnqg79VpHvUqLzNdIJBVMr5g-xJ7OHWtb9yfZEd3HzQDPphTg/exec";
 
 
+
 let globalData = {};
 let currentTab = "Kecamatan";
 let chartInstance = null;
 let spreadsheetInfoTime = "Sync Real-time";
+
+// Konfigurasi Auto-Sync: 5 Menit (300 Detik)
+const SYNC_INTERVAL_SEC = 300;
+let syncCountdown = SYNC_INTERVAL_SEC;
+let syncTimerInterval = null;
 
 const targetStatus = [
     "OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas", 
@@ -17,22 +23,22 @@ const statusColors = {
     "APPROVED BY Pengawas": "#10b981", "REVOKED BY Pengawas": "#64748b", "SUBMITTED RESPONDENT": "#8b5cf6", "EDITED BY Pengawas": "#06b6d4"
 };
 
+// Struktur Definisi Kolom Dikunci Sesuai Spreadsheet Anda
 const tableColumnsDefinition = {
     "Kecamatan": [
         "Kecamatan", "OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas",
         "APPROVED BY Pengawas", "REVOKED BY Pengawas", "SUBMITTED RESPONDENT", "EDITED BY Pengawas",
-        "Only Open [SLS]", "PROGRES", "Target Harian", "23-06-2026", "16.88%"
+        "Only Open [SLS]", "PROGRES", "Target Harian"
     ],
     "Desa": [
         "Kecamatan", "Desa", "OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas",
         "APPROVED BY Pengawas", "REVOKED BY Pengawas", "SUBMITTED RESPONDENT", "EDITED BY Pengawas",
-        "Only Open [SLS]", "Progres"
+        "Only Open [SLS]", "Progres", "Target Harian"
     ],
     "PETUGAS": [
         "Kecamatan", "PML", "PPL", "Pengawas - Email", "Pencacah - Email", "OPEN", "DRAFT",
         "SUBMITTED BY Pencacah", "REJECTED BY Pengawas", "APPROVED BY Pengawas", "REVOKED BY Pengawas",
-        "SUBMITTED RESPONDENT", "EDITED BY Pengawas", "Only Open", "Persentase Progres",
-        "Target Harian", "23-06-2026", "16.88%", "selain open", "Rank"
+        "SUBMITTED RESPONDENT", "EDITED BY Pengawas", "Only Open", "Persentase Progres", "Target Harian", "Rank"
     ],
     "SLS": [
         "idsubsls", "Kecamatan", "Desa", "jenis", "nmsls", "jumlah_kk", "jumlah_bstt", "jumlah_bsbtt",
@@ -45,11 +51,32 @@ const tableColumnsDefinition = {
 
 $(document).ready(function() {
     loadDashboardWithProgress();
+    startSyncTimer();
     
     $('#filterWilayah, #filterAssignment').change(function() {
         executeGlobalFilters();
     });
 });
+
+// Hitung Mundur Auto Sync Otomatis
+function startSyncTimer() {
+    if (syncTimerInterval) clearInterval(syncTimerInterval);
+    syncCountdown = SYNC_INTERVAL_SEC;
+    
+    syncTimerInterval = setInterval(() => {
+        syncCountdown--;
+        let min = Math.floor(syncCountdown / 60).toString().padStart(2, '0');
+        let sec = (syncCountdown % 60).toString().padStart(2, '0');
+        $('#txtSyncTimer').text(`Auto-Sync: ${min}:${sec}`);
+        
+        if (syncCountdown <= 0) {
+            clearInterval(syncTimerInterval);
+            $('#loader').removeClass('hidden');
+            loadDashboardWithProgress();
+            startSyncTimer();
+        }
+    }, 1000);
+}
 
 function updateProgressBar(percent, text) {
     $('#loadingProgressFill').css('width', percent + '%');
@@ -64,9 +91,9 @@ async function loadDashboardWithProgress() {
         updateProgressBar(45, "Mendownload data dari Google Spreadsheet...");
         globalData = await response.json();
         
-        updateProgressBar(75, "Mengekstrak informasi tanggal waktu Cell A1...");
+        updateProgressBar(75, "Mengekstrak informasi update data (Cell A1)...");
         
-        // EKSTRAKSI INFORMASI WAKTU DARI CELL A1 (Mencari kunci bernilai KONDISI)
+        // Ambil info nama kolom / waktu di Cell A1 yang mengandung kata KONDISI
         if (globalData["Kecamatan"] && globalData["Kecamatan"].length > 0) {
             let sampleRow = globalData["Kecamatan"][0];
             let foundTimeKey = Object.keys(sampleRow).find(k => k.toString().includes("KONDISI"));
@@ -75,7 +102,6 @@ async function loadDashboardWithProgress() {
             }
         }
 
-        // Normalisasi key-value data agar tidak kosong saat di-hardcode
         cleanAndNormalizeKeys();
 
         updateProgressBar(100, "Selesai! Membuka dashboard...");
@@ -84,49 +110,36 @@ async function loadDashboardWithProgress() {
             document.getElementById('loader').classList.add('hidden');
             document.getElementById('dashboardContent').classList.remove('hidden');
             
-            // Masukkan Teks Cell A1 ke Navbar
+            // Masukkan Teks Waktu Cell A1 ke Navbar
             document.getElementById('txtLastUpdate').innerText = spreadsheetInfoTime;
             
             renderKabupatenSummary();
             buildWilayahDropdown();
-            switchTab("Kecamatan");
+            switchTab(currentTab);
         }, 400);
 
     } catch (e) {
         console.error(e);
-        $('#loadingProgressText').html(`<span class="text-red-500">Gagal memuat data. Periksa Apps Script Anda.</span>`);
+        $('#loadingProgressText').html(`<span class="text-red-500">Gagal sinkronisasi data spreadsheet.</span>`);
     }
 }
 
-// FUNGSI UTAMA PENYELAMAT DATA KOSONG (Fuzzy Map Normalizer)
 function cleanAndNormalizeKeys() {
     Object.keys(globalData).forEach(sheetName => {
         globalData[sheetName] = globalData[sheetName].map(row => {
             let newRow = {};
-            
-            // Salin data asli sambil bersihkan spasi nama properti
-            Object.keys(row).forEach(k => {
-                newRow[k.trim()] = row[k];
-            });
+            Object.keys(row).forEach(k => { newRow[k.trim()] = row[k]; });
 
-            // Pemetaan Pintar khusus untuk Kolom Persentase Akhir Progres
-            let progValue = row["PROGRES"] || row["Progres"] || row["progres"] || row["16.88%"] || row["Persentase Progres"];
+            let progValue = row["Progres"] || row["PROGRES"] || row["progres"] || row["Persentase Progres"];
             if (progValue !== undefined) {
                 newRow["PROGRES"] = progValue;
                 newRow["Progres"] = progValue;
                 newRow["Persentase Progres"] = progValue;
-                newRow["16.88%"] = progValue;
             }
 
-            // Pemetaan Pintar khusus untuk Kolom Batas Tanggal Target & Target Harian
             let targetDayValue = row["Target Harian"] || row["target harian"];
             if (targetDayValue !== undefined) {
                 newRow["Target Harian"] = targetDayValue;
-            }
-
-            let dateTargetValue = row["23-06-2026"] || row["23-06-2026"];
-            if (dateTargetValue !== undefined) {
-                newRow["23-06-2026"] = dateTargetValue;
             }
 
             if (newRow["Kecamatan"]) {
@@ -143,18 +156,20 @@ function renderKabupatenSummary() {
     
     if (kabRow) {
         document.getElementById('kabApproved').innerText = (parseInt(kabRow["APPROVED BY Pengawas"]) || 0).toLocaleString('id-ID');
-        
         let rawProg = kabRow["PROGRES"] || 0;
-        if (typeof rawProg === "string") rawProg = parseFloat(rawProg.replace(/[^0-9.]/g, ''));
-        if (rawProg < 1 && rawProg > 0) rawProg = rawProg * 100;
-        
-        document.getElementById('kabProgres').innerText = parseFloat(rawProg).toFixed(2) + "%";
+        if (typeof rawProg === "string") rawProg = rawProg.replace(/[^0-9.]/g, '');
+        let num = parseFloat(rawProg);
+        if (!isNaN(num)) {
+            if (num <= 1 && num > 0) num = num * 100;
+            document.getElementById('kabProgres').innerText = num.toFixed(2) + "%";
+        }
     }
 }
 
 function buildWilayahDropdown() {
     const kecData = globalData["Kecamatan"] || [];
     const select = $('#filterWilayah');
+    const currVal = select.val();
     select.find('option:not(:first)').remove();
     
     kecData.forEach(row => {
@@ -164,6 +179,57 @@ function buildWilayahDropdown() {
             select.append(`<option value="${clean}">${raw}</option>`);
         }
     });
+    if(currVal) select.val(currVal);
+}
+
+// LOGIKA UTAMA: PERINGKAT 10 PPL TERTINGGI & TERENDAH
+function generateTopBottomPplHighlight(cleanWilayah) {
+    let petugasData = globalData["PETUGAS"] || [];
+    
+    if (cleanWilayah) {
+        petugasData = petugasData.filter(r => {
+            if (!r["Kecamatan"]) return false;
+            let targetClean = r["Kecamatan"].toString().replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
+            return targetClean.toLowerCase().includes(cleanWilayah.toLowerCase());
+        });
+    }
+
+    let validPpl = petugasData.map(p => {
+        let rawProg = p["Persentase Progres"] || 0;
+        if (typeof rawProg === "string") rawProg = rawProg.replace(/[^0-9.]/g, '');
+        let num = parseFloat(rawProg);
+        if (!isNaN(num) && num <= 1 && num > 0) num = num * 100;
+        p["_numProg"] = isNaN(num) ? 0 : num;
+        return p;
+    }).filter(p => p["PPL"] !== undefined && p["PPL"] !== "");
+
+    // Sort untuk Tertinggi dan Terendah
+    let sortedTop = [...validPpl].sort((a, b) => b["_numProg"] - a["_numProg"]);
+    let sortedBottom = [...validPpl].sort((a, b) => a["_numProg"] - b["_numProg"]);
+
+    // Render HTML Tertinggi
+    let topHtml = "";
+    sortedTop.slice(0, 10).forEach((ppl, index) => {
+        let kecName = ppl["Kecamatan"] ? ppl["Kecamatan"].toString().split("-")[1] || ppl["Kecamatan"] : "";
+        topHtml += `<tr>
+            <td class="p-2 text-center font-bold text-slate-500">${index + 1}</td>
+            <td class="p-2 font-semibold text-slate-700">${ppl["PPL"]} <span class="text-[10px] text-slate-400 font-normal">(${kecName.trim()})</span></td>
+            <td class="p-2 text-center font-bold text-emerald-600">${ppl["_numProg"].toFixed(2)}%</td>
+        </tr>`;
+    });
+    $('#topPplList').html(topHtml || `<tr><td colspan="3" class="p-3 text-center text-slate-400">Tidak ada data</td></tr>`);
+
+    // Render HTML Terendah
+    let bottomHtml = "";
+    sortedBottom.slice(0, 10).forEach((ppl, index) => {
+        let kecName = ppl["Kecamatan"] ? ppl["Kecamatan"].toString().split("-")[1] || ppl["Kecamatan"] : "";
+        bottomHtml += `<tr>
+            <td class="p-2 text-center font-bold text-slate-500">${index + 1}</td>
+            <td class="p-2 font-semibold text-slate-700">${ppl["PPL"]} <span class="text-[10px] text-slate-400 font-normal">(${kecName.trim()})</span></td>
+            <td class="p-2 text-center font-bold text-rose-600">${ppl["_numProg"].toFixed(2)}%</td>
+        </tr>`;
+    });
+    $('#bottomPplList').html(bottomHtml || `<tr><td colspan="3" class="p-3 text-center text-slate-400">Tidak ada data</td></tr>`);
 }
 
 function switchTab(tabName) {
@@ -196,9 +262,9 @@ function buildDataTableStructure() {
             render: function(data, type, row) {
                 if (data === undefined || data === null || data === "") return "-";
                 
-                // Atur Tampilan Desimal Persentase Progres agar Seragam & Cantik
-                if (colName.toLowerCase().includes("progres") || colName === "16.88%" || colName.toLowerCase().includes("persentase")) {
-                    let num = parseFloat(data);
+                if (colName === "PROGRES" || colName === "Progres" || colName === "Persentase Progres" || colName === "Target Harian") {
+                    let cleanStr = data.toString().replace(/[^0-9.]/g, '');
+                    let num = parseFloat(cleanStr);
                     if (!isNaN(num)) {
                         if (num <= 1 && num > 0) num = num * 100;
                         return num.toFixed(2) + "%";
@@ -206,7 +272,6 @@ function buildDataTableStructure() {
                     return data;
                 }
                 
-                // Format Angka Ribuan untuk data numerik non-ID
                 if (type === 'display' && !isNaN(data) && colName !== "idsubsls" && !colName.toLowerCase().includes("date") && !colName.toLowerCase().includes("rank")) {
                     return Number(data).toLocaleString('id-ID');
                 }
@@ -224,14 +289,24 @@ function buildDataTableStructure() {
         ],
         pageLength: 10,
         scrollX: true,
+        
+        // LOGIKA PENGECEKAN WARNA BARIS: JIKA PROGRES < TARGET HARIAN (KURANG) -> MERAH
         createdRow: function(row, data, dataIndex) {
-            let app = parseInt(data["APPROVED BY Pengawas"]) || 0;
-            let open = parseInt(data["OPEN"]) || 0;
-            let total = app + open;
-            if (total > 0 && (app / total) < 0.2) {
-                $(row).addClass('bg-red-50/70');
-            } else if (total > 0 && (app / total) >= 0.8) {
-                $(row).addClass('bg-emerald-50/40');
+            let progresVal = data["PROGRES"] || data["Progres"] || data["Persentase Progres"] || "0";
+            let cleanProg = progresVal.toString().replace(/[^0-9.]/g, '');
+            let numProgres = parseFloat(cleanProg);
+            if (!isNaN(numProgres) && numProgres <= 1 && numProgres > 0) numProgres = numProgres * 100;
+
+            let targetHarianVal = data["Target Harian"] || "0";
+            let cleanTarget = targetHarianVal.toString().replace(/[^0-9.]/g, '');
+            let numTarget = parseFloat(cleanTarget);
+            if (!isNaN(numTarget) && numTarget <= 1 && numTarget > 0) numTarget = numTarget * 100;
+
+            if (!isNaN(numProgres) && !isNaN(numTarget)) {
+                if (numProgres < numTarget) {
+                    // Masuk kondisi "Kurang" -> Ganti teks & baris jadi merah penuh
+                    $(row).addClass('row-target-failed');
+                }
             }
         }
     });
@@ -255,6 +330,7 @@ function executeGlobalFilters() {
     table.draw();
 
     renderDinamisChart(valSelected);
+    generateTopBottomPplHighlight(valSelected);
 }
 
 function renderDinamisChart(cleanWilayah) {
