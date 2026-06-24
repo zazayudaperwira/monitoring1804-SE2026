@@ -2,11 +2,19 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitoring 1804</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 </head>
 <body class="bg-orange-50 p-6">
+    <div id="loader" class="fixed inset-0 bg-white flex flex-col items-center justify-center z-[9999]">
+        <div class="w-64 h-4 bg-orange-100 rounded-full overflow-hidden">
+            <div id="progress-bar" class="h-full bg-orange-600 w-0 transition-all duration-300"></div>
+        </div>
+        <p class="mt-4 font-bold text-orange-700"><span id="perc">0</span>% Memuat Data...</p>
+    </div>
+
     <div class="max-w-7xl mx-auto space-y-6">
         <div class="bg-orange-600 p-8 rounded-3xl text-white shadow-lg">
             <h1 class="text-3xl font-black">MONITORING 1804</h1>
