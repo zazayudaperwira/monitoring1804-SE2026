@@ -14,15 +14,38 @@ $(document).ready(function() {
         allData = res.data;
         $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
         
-        // Progres Kab Lampung Timur
         const kabData = allData.Kecamatan.find(d => d.Kecamatan === "Lampung Timur");
         if(kabData) $('#kabProgres').text((Number(kabData.Progres) * 100).toFixed(1) + "%");
         
         [...new Set(allData.Kecamatan.map(d => d.Kecamatan))].forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
+        
         switchTab('Kecamatan');
         updateChart();
+        updateLeaderboard(); 
     });
 });
+
+function updateLeaderboard() {
+    if (!allData.PETUGAS) return;
+
+    let sortedData = [...allData.PETUGAS].sort((a, b) => Number(b.Progres) - Number(a.Progres));
+
+    const renderTable = (data, elementId) => {
+        let html = `<table class="w-full text-left"><thead><tr class="border-b"><th class="py-2">Rank</th><th>Petugas</th><th>Progres</th></tr></thead><tbody>`;
+        data.forEach((d, i) => {
+            html += `<tr class="border-b">
+                <td class="py-2 font-bold">${i + 1}</td>
+                <td>${d.Nama}<br><span class="text-[10px] text-gray-500">${d.Kecamatan}</span></td>
+                <td class="font-bold">${(Number(d.Progres) * 100).toFixed(1)}%</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+        $(`#${elementId}`).html(html);
+    };
+
+    renderTable(sortedData.slice(0, 10), 'topPetugas');
+    renderTable(sortedData.slice(-10).reverse(), 'bottomPetugas');
+}
 
 function updateChart() {
     if (!allData.SLS) return;
