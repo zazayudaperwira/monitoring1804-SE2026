@@ -6,32 +6,39 @@ $(document).ready(async () => {
         const response = await fetch(API_URL);
         allData = await response.json();
         
-        // Isi Filter Kecamatan
-        const kec = [...new Set(allData["Kecamatan"].map(r => r["Kecamatan"]))];
-        kec.forEach(k => $('#filterKec').append(`<option value="${k}">${k}</option>`));
-        
         $('#loader').fadeOut();
+        // Memuat tab default saat pertama kali dibuka
         loadTable('Kecamatan');
-    } catch (e) { $('#loader').hide(); alert("Gagal memuat data"); }
+    } catch (e) { 
+        $('#loader').hide(); 
+        console.error("Gagal memuat data:", e); 
+    }
 });
 
 function loadTable(sheetName) {
-    // Styling Tab
+    // 1. Validasi: Pastikan data untuk sheet tersebut ada
+    if (!allData[sheetName]) {
+        console.error("Data untuk sheet " + sheetName + " tidak ditemukan di API!");
+        return;
+    }
+
+    // 2. Styling Tab (Warna Aktif)
     $('.tab-btn').removeClass('bg-orange-600 text-white').addClass('bg-orange-100 text-orange-700');
-    $(`[onclick="loadTable('${sheetName}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
+    $(`button[onclick="loadTable('${sheetName}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
 
+    // 3. Ambil data spesifik per sheet
     const data = allData[sheetName];
-    if ($.fn.DataTable.isDataTable('#mainDataTable')) $('#mainDataTable').DataTable().destroy();
-    
-    const table = $('#mainDataTable').DataTable({
-        data: data,
-        columns: Object.keys(data[0]).map(k => ({ title: k, data: k })),
-        scrollX: true,
-        destroy: true
-    });
 
-    // Event Filter
-    $('#filterKec').off('change').on('change', function() {
-        table.column(0).search(this.value).draw();
+    // 4. Hancurkan tabel lama & buat tabel baru
+    if ($.fn.DataTable.isDataTable('#mainDataTable')) {
+        $('#mainDataTable').DataTable().destroy();
+    }
+    
+    $('#mainDataTable').DataTable({
+        data: data,
+        columns: Object.keys(data[0] || {}).map(k => ({ title: k, data: k })),
+        scrollX: true,
+        destroy: true,
+        pageLength: 10
     });
 }
