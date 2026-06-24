@@ -4,7 +4,13 @@ let chart = null;
 const STATUS_COLS = ["OPEN", "DRAFT", "SUBMITTED BY Pencacah", "REJECTED BY Pengawas", "APPROVED BY Pengawas", "REVOKED BY Pengawas", "SUBMITTED RESPONDENT", "EDITED BY Pengawas"];
 
 $(document).ready(function() {
+    let progress = 0;
+    let interval = setInterval(() => { progress += 10; $('#progressBar').css('width', progress + '%'); if(progress >= 90) clearInterval(interval); }, 150);
+
     fetch(API).then(res => res.json()).then(res => {
+        clearInterval(interval);
+        $('#progressBar').css('width', '100%');
+        setTimeout(() => $('#progressContainer').hide(), 300);
         allData = res.data;
         $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
         [...new Set(allData.Kecamatan.map(d => d.Kecamatan))].forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
@@ -65,8 +71,9 @@ function switchTab(sheet) {
 }
 
 function applyFilters() {
-    const table = $('#mainTable').DataTable();
-    table.search(`${$('#fKec').val()} ${$('#fDesa').val()} ${$('#fStat').val()}`.trim()).draw();
+    if($.fn.DataTable.isDataTable('#mainTable')) {
+        $('#mainTable').DataTable().search(`${$('#fKec').val()} ${$('#fDesa').val()} ${$('#fStat').val()}`.trim()).draw();
+    }
 }
 
 $('#fKec').change(function() { 
@@ -74,8 +81,7 @@ $('#fKec').change(function() {
     allData.Desa.filter(d => d.Kecamatan === $(this).val()).forEach(d => $('#fDesa').append(`<option value="${d.Desa}">${d.Desa}</option>`));
     updateChart(); applyFilters();
 });
-
-$('#fDesa, #fStat').change(() => { updateChart(); applyFilters(); });
+$('#fDesa, #fStat').change(() => { applyFilters(); updateChart(); });
 
 function resetFilters() {
     $('#fKec').val(""); $('#fDesa').html('<option value="">Semua Desa</option>').val(""); $('#fStat').val("");
