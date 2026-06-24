@@ -14,7 +14,6 @@ $(document).ready(function() {
         allData = res.data;
         $('#updateInfo').text("Update Terakhir: " + res.metadata.update);
         [...new Set(allData.Kecamatan.map(d => d.Kecamatan))].forEach(k => $('#fKec').append(`<option value="${k}">${k}</option>`));
-        STATUS_COLS.forEach(s => $('#fStat').append(`<option value="${s}">${s}</option>`));
         switchTab('Kecamatan');
         updateChart();
     });
@@ -24,35 +23,22 @@ function updateChart() {
     if (!allData.SLS) return;
     const kec = $('#fKec').val();
     const desa = $('#fDesa').val();
-    const stat = $('#fStat').val();
-    let labels = [], datasets = [];
+    let filteredData = allData.SLS.filter(d => (kec === "" || d.Kecamatan.includes(kec)) && (desa === "" || d.Desa.includes(desa)));
 
-    let filteredData = allData.SLS.filter(d => 
-        (kec === "" || d.Kecamatan.includes(kec)) && 
-        (desa === "" || d.Desa.includes(desa))
-    );
-
-    let targetCols = stat !== "" ? [stat] : STATUS_COLS;
+    let labels = [], datasets = STATUS_COLS.map((col, i) => ({
+        label: col, data: [], backgroundColor: `hsl(${(i * 45)}, 70%, 60%)`
+    }));
 
     if (kec === "") {
-        labels = targetCols;
-        let totals = targetCols.map(col => filteredData.reduce((sum, d) => sum + (Number(d[col]) || 0), 0));
-        datasets = [{ label: stat || 'Total Kabupaten', data: totals, backgroundColor: '#ea580c' }];
+        labels = ["Kabupaten"];
+        datasets.forEach(ds => ds.data = [filteredData.reduce((sum, d) => sum + (Number(d[ds.label]) || 0), 0)]);
     } else if (desa === "") {
         labels = allData.Desa.filter(d => d.Kecamatan === kec).map(d => d.Desa);
-        datasets = targetCols.map((col, i) => ({
-            label: col,
-            data: labels.map(desaName => filteredData.filter(d => d.Desa === desaName).reduce((sum, d) => sum + (Number(d[col]) || 0), 0)),
-            backgroundColor: `hsl(${(i * 45)}, 70%, 60%)`
-        }));
+        datasets.forEach(ds => ds.data = labels.map(dName => filteredData.filter(d => d.Desa === dName).reduce((sum, d) => sum + (Number(d[ds.label]) || 0), 0)));
     } else {
         const desaSLS = filteredData.filter(d => d.Desa === desa);
         labels = desaSLS.map(d => d.nmsls);
-        datasets = targetCols.map((col, i) => ({
-            label: col,
-            data: desaSLS.map(d => Number(d[col]) || 0),
-            backgroundColor: `hsl(${(i * 45)}, 70%, 60%)`
-        }));
+        datasets.forEach(ds => ds.data = desaSLS.map(d => Number(d[ds.label]) || 0));
     }
 
     if(chart) chart.destroy();
@@ -69,18 +55,24 @@ function switchTab(sheet) {
     $(`button[onclick="switchTab('${sheet}')"]`).removeClass('bg-orange-100 text-orange-700').addClass('bg-orange-600 text-white');
     
     if ($.fn.DataTable.isDataTable('#mainTable')) { $('#mainTable').DataTable().destroy(); $('#mainTable').empty(); }
+    
     $('#mainTable').DataTable({ 
         data: allData[sheet], 
         columns: Object.keys(allData[sheet][0]).map(k => ({ title: k, data: k })), 
         scrollX: true, 
         destroy: true,
+        rowCallback: function(row, data) {
+            if (data['Target Harian'] === 'Tidak') {
+                $(row).find('td').filter(function() { return $(this).text() === 'Tidak'; })
+                    .css({ 'background-color': '#fee2e2', 'color': '#b91c1c', 'font-weight': 'bold' });
+            }
+        },
         initComplete: () => applyFilters() 
     });
 }
 
 function applyFilters() {
     if($.fn.DataTable.isDataTable('#mainTable')) {
-        // Hanya memfilter berdasarkan Kecamatan dan Desa
         $('#mainTable').DataTable().search(`${$('#fKec').val()} ${$('#fDesa').val()}`.trim()).draw();
     }
 }
@@ -90,10 +82,10 @@ $('#fKec').change(function() {
     allData.Desa.filter(d => d.Kecamatan === $(this).val()).forEach(d => $('#fDesa').append(`<option value="${d.Desa}">${d.Desa}</option>`));
     updateChart(); applyFilters();
 });
+
 $('#fDesa').change(() => { applyFilters(); updateChart(); });
-$('#fStat').change(() => updateChart()); // Status hanya update grafik
 
 function resetFilters() {
-    $('#fKec').val(""); $('#fDesa').html('<option value="">Semua Desa</option>').val(""); $('#fStat').val("");
+    $('#fKec').val(""); $('#fDesa').html('<option value="">Semua Desa</option>').val("");
     updateChart(); applyFilters();
 }
