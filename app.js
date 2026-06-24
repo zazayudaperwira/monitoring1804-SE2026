@@ -24,23 +24,31 @@ function updateChart() {
     if (!allData.SLS) return;
     const kec = $('#fKec').val();
     const desa = $('#fDesa').val();
+    const stat = $('#fStat').val();
     let labels = [], datasets = [];
 
+    let filteredData = allData.SLS.filter(d => 
+        (kec === "" || d.Kecamatan.includes(kec)) && 
+        (desa === "" || d.Desa.includes(desa))
+    );
+
+    let targetCols = stat !== "" ? [stat] : STATUS_COLS;
+
     if (kec === "") {
-        labels = STATUS_COLS;
-        let totals = STATUS_COLS.map(col => allData.SLS.reduce((sum, d) => sum + (Number(d[col]) || 0), 0));
-        datasets = [{ label: 'Total Kabupaten', data: totals, backgroundColor: '#ea580c' }];
+        labels = targetCols;
+        let totals = targetCols.map(col => filteredData.reduce((sum, d) => sum + (Number(d[col]) || 0), 0));
+        datasets = [{ label: stat || 'Total Kabupaten', data: totals, backgroundColor: '#ea580c' }];
     } else if (desa === "") {
         labels = allData.Desa.filter(d => d.Kecamatan === kec).map(d => d.Desa);
-        datasets = STATUS_COLS.map((col, i) => ({
+        datasets = targetCols.map((col, i) => ({
             label: col,
-            data: labels.map(desaName => allData.SLS.filter(d => d.Desa === desaName).reduce((sum, d) => sum + (Number(d[col]) || 0), 0)),
+            data: labels.map(desaName => filteredData.filter(d => d.Desa === desaName).reduce((sum, d) => sum + (Number(d[col]) || 0), 0)),
             backgroundColor: `hsl(${(i * 45)}, 70%, 60%)`
         }));
     } else {
-        const desaSLS = allData.SLS.filter(d => d.Desa === desa);
+        const desaSLS = filteredData.filter(d => d.Desa === desa);
         labels = desaSLS.map(d => d.nmsls);
-        datasets = STATUS_COLS.map((col, i) => ({
+        datasets = targetCols.map((col, i) => ({
             label: col,
             data: desaSLS.map(d => Number(d[col]) || 0),
             backgroundColor: `hsl(${(i * 45)}, 70%, 60%)`
@@ -72,7 +80,8 @@ function switchTab(sheet) {
 
 function applyFilters() {
     if($.fn.DataTable.isDataTable('#mainTable')) {
-        $('#mainTable').DataTable().search(`${$('#fKec').val()} ${$('#fDesa').val()} ${$('#fStat').val()}`.trim()).draw();
+        // Hanya memfilter berdasarkan Kecamatan dan Desa
+        $('#mainTable').DataTable().search(`${$('#fKec').val()} ${$('#fDesa').val()}`.trim()).draw();
     }
 }
 
@@ -81,7 +90,8 @@ $('#fKec').change(function() {
     allData.Desa.filter(d => d.Kecamatan === $(this).val()).forEach(d => $('#fDesa').append(`<option value="${d.Desa}">${d.Desa}</option>`));
     updateChart(); applyFilters();
 });
-$('#fDesa, #fStat').change(() => { applyFilters(); updateChart(); });
+$('#fDesa').change(() => { applyFilters(); updateChart(); });
+$('#fStat').change(() => updateChart()); // Status hanya update grafik
 
 function resetFilters() {
     $('#fKec').val(""); $('#fDesa').html('<option value="">Semua Desa</option>').val(""); $('#fStat').val("");
